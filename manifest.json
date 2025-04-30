@@ -1,0 +1,22 @@
+{
+    "name": "10th",
+    "short_name": "10th",
+    "description": "A simple app to keep track of your givings to church",
+
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#131313",
+    "theme_color": "#131313",
+    "icons": [
+      {
+        "src": "icon192.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      },
+      {
+        "src": "icon144.png",
+        "sizes": "144x144",
+        "type": "image/png"
+      }
+    ]
+}

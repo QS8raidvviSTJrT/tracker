@@ -1,0 +1,909 @@
+:root {
+    /* NEUES Farbschema */
+    --primary-color: #2563eb;    /* Starkes professionelles Blau */
+    --secondary-color: #1e40af;  /* Dunkleres Blau für Tiefe */
+    --accent-color: #0284c7;     /* Ergänzendes Business-Blau */
+    --text-color: #1e293b;       /* Dunkles Schiefergrau für Text */
+    --bg-color: #ffffff;         /* Sauberes weißes Hintergrund */
+    --card-bg: #f8fafc;          /* Helles Grau für Karten */
+    --card-border: #e2e8f0;      /* Dezente Randfarbe */
+    --text-on-primary: #ffffff;  /* Textfarbe auf primärem Hintergrund */
+    --text-on-accent: #ffffff;   /* Textfarbe auf Akzentfarbe */
+    --danger-color: #dc2626;     /* Rot für Warnungen/Löschen */
+    --success-color: #16a34a;    /* Grün für Erfolg */
+
+    --nav-height: 65px;          /* Höhe der Navigationsleiste */
+    --border-radius-std: 8px;    /* Standard Eckenradius */
+    --border-radius-large: 12px; /* Größerer Eckenradius */
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; /* System Font Stack */
+}
+
+body {
+    background-color: var(--bg-color); /* Weißer Hintergrund */
+    min-height: 100vh;
+    padding: 15px 15px var(--nav-height) 15px;
+    touch-action: pan-x pan-y;
+    color: var(--text-color); /* Dunkler Text */
+    -webkit-tap-highlight-color: transparent; /* Klick-Highlight auf Touch entfernen */
+}
+
+/* --- Login Container --- */
+.login-container {
+    max-width: 400px;
+    margin: 40px auto;
+    padding: 30px;
+    background: var(--card-bg); /* Helle Karte */
+    border-radius: var(--border-radius-large); /* Größerer Radius */
+    border: 1px solid var(--card-border); /* Dezenter Rand */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* Leichter Schatten */
+    text-align: center;
+}
+
+.login-container img {
+    max-width: 70px; /* Etwas kleineres Logo */
+    margin-bottom: 20px;
+}
+
+.login-container h2 {
+    color: var(--text-color);
+    margin-bottom: 25px;
+}
+
+/* Konsistente Input-Stile */
+input[type="email"],
+input[type="password"],
+input[type="text"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+    width: 100%; /* Volle Breite */
+    padding: 12px 15px; /* Einheitliches Padding */
+    margin-bottom: 15px; /* Einheitlicher Abstand */
+    border: 1px solid var(--card-border); /* Dezenter Rand */
+    border-radius: var(--border-radius-std); /* Standard Radius */
+    font-size: 1rem;
+    background-color: var(--bg-color); /* Weißer Hintergrund */
+    color: var(--text-color); /* Dunkler Text */
+    box-sizing: border-box; /* Korrektes Box-Modell */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    appearance: none; /* Standard-Aussehen entfernen */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary-color); /* Blauer Rand bei Fokus */
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); /* Leichter blauer Schein */
+}
+
+/* Select Pfeil */
+select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.25em 1.25em;
+    padding-right: 2.5rem; /* Platz für den Pfeil */
+}
+
+textarea {
+    min-height: 80px; /* Mindesthöhe für Textarea */
+    resize: vertical;
+}
+
+/* Container für Login/Register Buttons */
+.button-container {
+    position: relative;
+    width: 100%; /* Volle Breite nehmen */
+    height: 48px; /* Feste Höhe für Buttons */
+    margin: 20px 0 15px 0; /* Abstand anpassen */
+}
+
+/* Konsistente Button-Stile */
+button, .loginbutton, .registerbutton, #searchStreetButton, #installButton {
+    padding: 12px 20px; /* Einheitliches Padding */
+    border-radius: var(--border-radius-std); /* Standard Radius */
+    font-size: 1rem;
+    font-weight: 500; /* Etwas fetter */
+    cursor: pointer;
+    border: none; /* Kein Rand standardmäßig */
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+    text-align: center;
+    display: inline-flex; /* Für Icon + Text Zentrierung */
+    align-items: center;
+    justify-content: center;
+    gap: 8px; /* Abstand zwischen Icon und Text */
+}
+
+button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:active, #installButton:active {
+     transform: scale(0.98); /* Leichter Klick-Effekt */
+}
+
+/* Primär-Buttons (Login, Suchen etc.) */
+.loginbutton, #searchStreetButton {
+    background-color: var(--primary-color); /* Blau */
+    color: var(--text-on-primary); /* Weißer Text */
+    width: 100%; /* Volle Breite im Container */
+    height: 100%;
+    position: absolute; /* Für Überlagerung im Login */
+    top: 0;
+    left: 0;
+}
+.loginbutton:hover, #searchStreetButton:hover {
+    background-color: var(--secondary-color); /* Dunkleres Blau im Hover */
+}
+
+/* Sekundär/Register-Button */
+.registerbutton {
+    background-color: var(--accent-color); /* Helles Business-Blau */
+    color: var(--text-on-accent);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+.registerbutton:hover {
+    background-color: #0369a1; /* Dunkleres Akzent-Blau */
+}
+
+.hidden {
+    visibility: hidden;
+    opacity: 0; /* Ausblenden für Transition */
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.button-container .loginbutton:not(.hidden) ~ .registerbutton {
+    /* Style wenn Login sichtbar ist */
+}
+.button-container .registerbutton:not(.hidden) ~ .loginbutton {
+     /* Style wenn Register sichtbar ist */
+}
+
+
+#registerText, #resetText {
+    display: block;
+    text-align: center; /* Zentrieren */
+    margin-top: 15px;
+    font-size: 0.9em;
+}
+#registerText a, #resetText a {
+    color: var(--primary-color); /* Blau für Links */
+    text-decoration: none;
+}
+#registerText a u, #resetText a u {
+    text-decoration: underline;
+}
+#registerText a:hover, #resetText a:hover {
+    color: var(--secondary-color);
+}
+/* Link zum Login zurück (dynamisch erzeugt) */
+#loginContainer > div > a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 0.9em;
+}
+#loginContainer > div > a:hover {
+     color: var(--secondary-color);
+}
+
+/* --- APP STRUKTUR --- */
+.app-container {
+    width: 100%;
+    display: none;
+    flex-direction: column;
+    max-width: 800px;
+    margin: 0 auto;
+    position: relative;
+    height: auto; /* Oder 100% beibehalten, aber viewContainer anpassen */
+}
+
+.app-header {
+    display: flex;
+    justify-content: space-between; /* Titel links, Rest rechts */
+    align-items: center;
+    padding: 10px 0;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--card-border);
+    gap: 10px; /* Abstand zwischen Titel und rechter Gruppe */
+}
+
+.app-header h2 {
+    margin: 0;
+    font-size: 1.5em;
+    color: var(--text-color);
+    flex-shrink: 0; /* Verhindert, dass Titel schrumpft */
+    white-space: nowrap; /* Verhindert Umbruch des Titels */
+}
+
+/* Neuer Container für rechte Header-Elemente */
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Abstand zwischen PLZ, Suche, Logout */
+}
+
+/* PLZ Input im Header */
+.app-header #plzInput {
+    /* Nimmt generische Input-Stile an, aber überschreibt Breite etc. */
+    width: 75px; /* Breite für ca. 5 Ziffern + Padding */
+    max-width: 75px;
+    padding: 8px 10px; /* Weniger Padding */
+    margin-bottom: 0; /* Kein Abstand nach unten */
+    font-size: 0.95em; /* Etwas kleinere Schrift */
+    text-align: center; /* Zahlen zentrieren */
+    flex-shrink: 0; /* Nicht schrumpfen */
+}
+
+/* Search Button im Header */
+.app-header #searchStreetButton {
+    /* Nimmt generische Button-Stile an, aber wird zum Icon-Button */
+    background-color: transparent; /* Transparent */
+    color: var(--primary-color); /* Blaue Icon-Farbe */
+    padding: 0; /* Kein Text-Padding */
+    width: 40px; /* Feste Breite/Höhe */
+    height: 40px;
+    border-radius: 50%; /* Rund */
+    flex-shrink: 0; /* Nicht schrumpfen */
+    position: static; /* Nicht mehr absolut */
+    box-shadow: none; /* Kein Schatten */
+    border: 1px solid transparent; /* Platzhalter für Rand im Hover */
+}
+.app-header #searchStreetButton span.material-icons {
+    font-size: 24px; /* Passende Icon-Größe */
+    margin: 0; /* Kein extra Margin für Icon */
+}
+.app-header #searchStreetButton:hover {
+    background-color: #eef2ff; /* Heller blauer Hintergrund im Hover */
+    border-color: #dbeafe; /* Heller Rand im Hover */
+}
+.app-header #searchStreetButton:active {
+    transform: scale(0.95); /* Stärkerer Klick-Effekt */
+}
+
+/* Logout Button bleibt fast gleich, evtl. Hover anpassen */
+.logout {
+    width: 40px;
+    height: 40px;
+    background-color: transparent;
+    color: var(--text-color);
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    flex-shrink: 0; /* Nicht schrumpfen */
+}
+.logout span { font-size: 24px !important; }
+.logout:hover {
+    background-color: var(--card-bg);
+    color: var(--primary-color);
+}
+
+#viewContainer {
+    flex-grow: 1;
+    overflow-y: auto;
+    /* Höhe muss nun den gesamten Platz unter dem Header einnehmen */
+    /* Die Höhe wird jetzt vom Inhalt bestimmt bzw. durch scrollen */
+     height: auto;
+     /* padding-bottom: 15px; /* Kleiner Abstand am Ende */
+}
+
+.view {
+    display: none;
+    width: 100%;
+    height: 100%;
+}
+
+.view.active-view {
+    display: block;
+}
+
+/* Liste standardmäßig verstecken, wenn die View nicht aktiv ist */
+.view:not(.active-view) #streetListContainer,
+.view:not(.active-view) #streetDetailContainer {
+    display: none !important;
+}
+
+/* Allgemeine Karte für Inhalte in den Views */
+.content-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-large);
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid var(--card-border);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+}
+
+.content-card h2 {
+    margin-bottom: 15px;
+    text-align: center;
+    color: var(--text-color);
+}
+
+/* --- Navigationsleiste --- */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: var(--nav-height);
+    background-color: var(--bg-color);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+    z-index: 1000;
+    border-top: 1px solid var(--card-border);
+    transition: transform 0.3s ease-in-out;
+}
+
+body.nav-hidden .bottom-nav {
+    transform: translateY(100%);
+}
+
+.nav-item {
+    background: none;
+    border: none;
+    color: #6b7280; /* Grauer Text für inaktive Items */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    height: 100%;
+    padding: 5px 0;
+    font-size: 0.75em;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.nav-item span:first-child {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+.nav-item:hover {
+    color: var(--primary-color); /* Blau im Hover */
+}
+
+.nav-item.active {
+    color: var(--primary-color); /* Blau für aktives Item */
+    font-weight: 500; /* Leicht fetter für aktiv */
+}
+
+/* --- Stile für Straßen/PLZ Suche (innerhalb mainView) --- */
+
+/* === NEU: Stile für Alphabet-Filter === */
+.alphabet-filter-container {
+    display: flex; /* Buttons nebeneinander */
+    flex-wrap: wrap; /* Umbruch bei Bedarf */
+    justify-content: center; /* Zentrieren */
+    gap: 5px; /* Kleiner Abstand zwischen Buttons */
+    margin-bottom: 15px; /* Abstand zur Liste */
+    padding: 8px; /* Innenabstand */
+    background-color: var(--card-bg); /* Leichter Hintergrund */
+    border-radius: var(--border-radius-std);
+    border: 1px solid var(--card-border);
+    /* Wird von JS ein-/ausgeblendet */
+}
+
+.alphabet-button {
+    /* Nimmt generische Button-Stile an, aber angepasst */
+    padding: 0; /* Kein Padding, fixe Größe */
+    width: 30px; /* Breite */
+    height: 30px; /* Höhe */
+    min-width: 30px; /* Mindestbreite sicherstellen */
+    font-size: 0.9rem; /* Passende Schriftgröße */
+    font-weight: 600;
+    border-radius: 50%; /* Rund */
+    background-color: #e2e8f0; /* Heller Hintergrund für Buttons */
+    color: var(--text-color);
+    border: 1px solid transparent; /* Platzhalter für Rand */
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+    /* Flex-Eigenschaften entfernen, die vom generischen Button kommen könnten */
+    flex-grow: 0;
+    flex-shrink: 0;
+    display: inline-flex; /* Wichtig für Zentrierung */
+    align-items: center;
+    justify-content: center;
+}
+
+.alphabet-button:hover {
+    background-color: #cbd5e1; /* Dunklerer Hover */
+}
+
+.alphabet-button.active {
+    background-color: var(--primary-color); /* Blau für aktiven Button */
+    color: var(--text-on-primary);
+    border-color: var(--secondary-color);
+}
+
+.alphabet-button:active {
+     transform: scale(0.95);
+}
+/* === ENDE ALPHABET FILTER === */
+
+/* Höhe der Liste anpassen */
+.street-list-container {
+    height: auto;
+    overflow-y: auto;
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius-large);
+    background-color: var(--card-bg);
+    margin-bottom: 0;
+    flex-grow: 1;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* NEU: Stile für den Platzhalter */
+.list-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Horizontal zentrieren */
+    justify-content: center; /* Vertikal zentrieren */
+    text-align: center;
+    padding: 40px 20px; /* Innenabstand */
+    color: #6b7280; /* Grauer Text */
+    flex-grow: 1; /* Nimmt verfügbaren Platz ein */
+    /* Standardmäßig sichtbar, wird von JS ausgeblendet */
+    display: flex; /* War vorher block, jetzt flex für Zentrierung */
+}
+
+.placeholder-icon {
+    font-size: 48px; /* Größeres Icon */
+    margin-bottom: 15px;
+    color: #9ca3af; /* Helleres Grau für Icon */
+}
+
+.list-placeholder p {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    max-width: 350px; /* Maximale Breite für Lesbarkeit */
+}
+
+/* Stellt sicher, dass normale Listenelemente nicht zentriert werden */
+.street-list-container .street-item {
+    text-align: left; /* Standardausrichtung für Listenelemente */
+}
+.street-list-container > p { /* Für "Keine Ergebnisse"-Text */
+     text-align: center;
+     padding: 20px;
+     color: #6b7280;
+}
+
+.street-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--card-border); /* Dezenter Trenner */
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-size: 0.95em;
+    color: var(--text-color); /* Dunkler Text */
+}
+.street-item:last-child { border-bottom: none; }
+.street-item:hover { background-color: #eef2ff; } /* Sehr heller blauer Hover */
+
+/* Container für die Hausnummern-Details */
+.street-detail-container {
+    margin-top: 0;
+    padding: 0; /* Kein extra Padding außen */
+    background-color: transparent; /* Kein extra Hintergrund */
+    border-radius: 0;
+    border: none;
+}
+
+/* --- Stile für Hausnummern (JS-generiert) --- */
+#houseEntryForm {
+    margin-bottom: 15px; /* Weniger Abstand nach unten */
+    padding: 15px; /* Weniger Innenabstand */
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius-large);
+    border: 1px solid var(--card-border);
+}
+#houseEntryForm h5 {
+    text-align: center;
+    margin-bottom: 15px; /* Weniger Abstand */
+    font-size: 1.0em; /* Kleinere Überschrift */
+    font-weight: 600; /* Etwas fetter */
+    color: var(--text-color);
+}
+
+/* Inputs/Select/Textarea generell etwas kompakter */
+#houseEntryForm input[type="text"],
+#houseEntryForm select,
+#houseEntryForm textarea {
+    padding: 10px 12px; /* Etwas weniger vertikales Padding */
+    margin-bottom: 10px; /* Weniger Abstand nach unten */
+    font-size: 0.9rem; /* Kleinere Schrift */
+    /* Andere Stile bleiben */
+    width: 100%;
+    border-radius: var(--border-radius-std);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--card-border);
+}
+
+/* Spezifische Breiten für Hausnummer und Status beibehalten, aber mit weniger Abstand */
+#houseEntryForm input#houseNumberInput {
+     width: calc(100% - 260px); /* Breite etwas reduziert */
+     display: inline-block;
+     vertical-align: top;
+     margin-right: 8px; /* Weniger Abstand */
+     margin-bottom: 10px; /* Sicherstellen, dass Abstand da ist, wenn es umbricht */
+}
+
+#houseEntryForm input#nameInput {
+    width: calc(100% - 170px); /* Breite etwas reduziert */
+    display: inline-block;
+    vertical-align: top;
+    margin-right: 8px; /* Weniger Abstand */
+    margin-bottom: 10px; /* Sicherstellen, dass Abstand da ist, wenn es umbricht */
+}
+
+#houseEntryForm select#statusSelect {
+    width: calc(100% - 88px); /* Breite angepasst an Hausnummer + Abstand */
+    display: inline-block;
+    vertical-align: top;
+    margin-bottom: 10px;
+}
+
+#houseEntryForm textarea {
+    min-height: 60px; /* Minimale Höhe reduziert */
+    margin-bottom: 10px;
+}
+
+/* Container für die Buttons */
+#houseEntryForm .form-button-group {
+    display: flex; /* Buttons nebeneinander */
+    justify-content: space-between; /* Verteilt Buttons */
+    gap: 10px;
+    margin-top: 10px; /* Abstand nach oben */
+}
+
+/* Buttons im Formular kompakter */
+#houseEntryForm button {
+    margin-top: 0; /* Kein eigener Abstand nach oben mehr */
+    padding: 8px 15px; /* Weniger vertikales Padding */
+    font-size: 0.9rem; /* Kleinere Schrift */
+    flex-grow: 1; /* Buttons sollen sich den Platz teilen */
+    /* Andere Button-Stile werden übernommen */
+}
+
+/* Die spezifischen Button-Farben bleiben wie vorher definiert */
+/* Speicher-Button */
+#houseEntryForm button:nth-of-type(1) {
+     background-color: var(--primary-color);
+     color: var(--text-on-primary);
+     /* margin-right: 0; */ /* Nicht mehr nötig durch gap */
+}
+#houseEntryForm button:nth-of-type(1):hover {
+    background-color: var(--secondary-color);
+}
+/* Abbrechen/Neu Button */
+#houseEntryForm button:nth-of-type(2) {
+    background-color: #e2e8f0;
+    color: var(--text-color);
+    border: 1px solid var(--card-border);
+}
+#houseEntryForm button:nth-of-type(2):hover {
+    background-color: #cbd5e1;
+}
+
+/* Liste der Hausnummern-Einträge */
+#houseEntriesList {
+     margin-top: 20px;
+     border-top: 1px solid var(--card-border);
+     padding-top: 10px;
+     background-color: var(--card-bg); /* Hintergrund für die Liste */
+     border-radius: var(--border-radius-large);
+     padding: 10px; /* Innenabstand */
+     border: 1px solid var(--card-border);
+}
+#houseEntriesList > p { /* "Noch keine Einträge..." Text */
+    text-align: center;
+    color: #6b7280;
+    padding: 15px;
+}
+
+.house-entry-item {
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    font-size: 0.9em;
+}
+.house-entry-item:last-child { border-bottom: none; }
+.house-entry-item > div:first-child {
+    flex-grow: 1;
+    margin-right: 10px;
+    line-height: 1.4;
+}
+.house-entry-item strong {
+    font-size: 1.1em;
+    color: var(--text-color);
+}
+.house-entry-item small {
+    display: block;
+    color: #475569; /* Dunkleres Grau für Details */
+    margin-top: 3px;
+}
+.house-entry-item small[title] { cursor: help; }
+.house-entry-item > div:last-child {
+    flex-shrink: 0;
+    display: flex;
+    gap: 5px;
+}
+/* Edit/Delete Buttons in der Liste */
+.house-entry-item .buttonnumpad {
+    font-size: 0.9em; /* Etwas größer/lesbarer */
+    padding: 5px 8px; /* Mehr Padding */
+    width: auto;
+    height: auto;
+    min-width: 35px;
+    border-radius: var(--border-radius-std);
+    border: 1px solid transparent; /* Platzhalter für Rand */
+    background-color: transparent; /* Transparent */
+    color: #6b7280; /* Grau */
+}
+.house-entry-item .buttonnumpad:hover {
+    background-color: #eef2ff; /* Heller blauer Hintergrund */
+    color: var(--primary-color); /* Blau */
+    border-color: #dbeafe; /* Sehr heller blauer Rand */
+}
+/* Delete Button spezifisch */
+.house-entry-item button[onclick*="deleteHouseEntry"] {
+    color: var(--danger-color); /* Rotes Icon */
+}
+.house-entry-item button[onclick*="deleteHouseEntry"]:hover {
+    background-color: #fee2e2; /* Heller roter Hintergrund */
+    color: #b91c1c; /* Dunkleres Rot */
+    border-color: #fecaca; /* Heller roter Rand */
+}
+
+/* Lade- und Fehleranzeige */
+#loadingIndicator {
+    text-align: center;
+    padding: 15px;
+    color: #6b7280;
+}
+#errorDisplay {
+    background-color: #fee2e2; /* Heller roter Hintergrund */
+    color: #b91c1c; /* Dunkelroter Text */
+    padding: 12px 15px;
+    border-radius: var(--border-radius-std);
+    margin-top: 15px;
+    border: 1px solid #fecaca; /* Heller roter Rand */
+    text-align: center;
+    font-size: 0.9em;
+}
+
+/* --- INSTALL POPUP --- */
+.install-popup {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--card-bg); /* Helle Karte */
+    color: var(--text-color); /* Dunkler Text */
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    border-top-left-radius: var(--border-radius-large);
+    border-top-right-radius: var(--border-radius-large);
+    padding: 25px 20px; /* Mehr Padding */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    gap: 15px;
+    border-top: 1px solid var(--card-border);
+}
+.install-popup p {
+    margin: 0;
+    text-align: center;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+/* Icons im Install-Popup Text */
+.install-popup p .material-icons,
+.install-popup p .material-symbols-outlined {
+    vertical-align: -3px; /* Besser ausrichten */
+    font-size: 1.3rem;
+    display: inline-block;
+}
+
+#installButton {
+    /* Nimmt primären Button Stil an */
+    background-color: var(--primary-color);
+    color: var(--text-on-primary);
+    padding: 10px 25px; /* Etwas weniger vertikal, mehr horizontal */
+}
+#installButton:hover {
+    background-color: var(--secondary-color);
+}
+
+/* Stellen Sie sicher, dass mainView den vollen Platz einnimmt UND ein Flex Container ist */
+#mainView.active-view {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Styling für Lade- und Fehleranzeigen IN den Views */
+.loading-indicator-view, .error-display-view {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+}
+.error-display-view {
+    color: var(--danger-color);
+    background-color: #fee2e2;
+    border: 1px solid #fecaca;
+    border-radius: var(--border-radius-std);
+    margin: 20px; /* Abstand */
+    padding: 15px;
+}
+
+
+/* --- STATISTIK VIEW --- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Responsive Grid */
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.stat-item {
+    background-color: var(--bg-color);
+    padding: 15px;
+    border-radius: var(--border-radius-std);
+    text-align: center;
+    border: 1px solid var(--card-border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.8em;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.85em;
+    color: #475569;
+}
+
+.chart-container {
+    position: relative;
+    width: 100%;
+    max-width: 400px; /* Maximale Breite für den Chart */
+    margin: 20px auto;
+    height: auto; /* Höhe passt sich an */
+}
+/* Canvas selbst sollte keine feste Höhe bekommen, Chart.js regelt das */
+#statusChart {
+    display: block;
+    width: 100% !important; /* Wichtig, um Containerbreite zu nutzen */
+    height: auto !important; /* Höhe automatisch anpassen */
+}
+
+/* --- LEADERBOARD VIEW --- */
+.table-container {
+    width: 100%;
+    overflow-x: auto; /* Scrollen bei schmalen Bildschirmen */
+    margin-top: 15px;
+}
+
+#leaderboardTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+#leaderboardTable th, #leaderboardTable td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--card-border);
+}
+
+#leaderboardTable th {
+    background-color: var(--card-bg); /* Leichter Hintergrund für Header */
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+#leaderboardTable tbody tr:hover {
+    background-color: #eef2ff; /* Heller Hover */
+}
+
+#leaderboardTable td:first-child, #leaderboardTable th:first-child {
+    text-align: center; /* Rang zentrieren */
+    width: 50px; /* Feste Breite für Rang */
+}
+#leaderboardTable td:last-child, #leaderboardTable th:last-child {
+    text-align: right; /* Anzahl rechtsbündig */
+    width: 100px; /* Feste Breite für Anzahl */
+}
+
+/* Highlight für aktuellen User */
+#leaderboardTable tbody tr.current-user-row {
+    background-color: #dbeafe; /* Hellblau */
+    font-weight: bold;
+}
+#leaderboardTable tbody tr.current-user-row:hover {
+    background-color: #bfdbfe; /* Etwas dunkleres Blau im Hover */
+}
+
+
+/* --- EINSTELLUNGEN VIEW --- */
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Kleiner Abstand zwischen Label/Input */
+}
+
+.settings-form label {
+    font-size: 0.9em;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.settings-form input#displayNameInput {
+    /* Nimmt generische Input-Stile an */
+    margin-bottom: 15px; /* Abstand zum Button */
+}
+
+#saveSettingsButton {
+     /* Nimmt primären Button-Stil an */
+     background-color: var(--primary-color);
+     color: var(--text-on-primary);
+     align-self: flex-start; /* Button nicht auf volle Breite strecken */
+     padding: 10px 20px; /* Standard-Padding */
+}
+#saveSettingsButton:hover {
+    background-color: var(--secondary-color);
+}
+
+#settingsStatus {
+    min-height: 1.2em; /* Platzhalter für Statusmeldung */
+}
+#settingsStatus.success {
+    color: var(--success-color);
+}
+#settingsStatus.error {
+    color: var(--danger-color);
+}
+
+
+.settings-logout-button {
+    /* Style wie Abbrechen-Button */
+    background-color: #e2e8f0;
+    color: var(--text-color);
+    border: 1px solid var(--card-border);
+    width: 100%; /* Volle Breite */
+    padding: 12px 20px;
+}
+.settings-logout-button:hover {
+    background-color: #cbd5e1;
+}
+.settings-logout-button span {
+    vertical-align: -3px; /* Icon besser ausrichten */
+    margin-right: 8px;
+}
+
+/* ... restliche Stile ... */
