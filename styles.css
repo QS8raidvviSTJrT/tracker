@@ -140,6 +140,39 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
     background-color: var(--secondary-color); /* Dunkleres Blau im Hover */
 }
 
+/* --- Ladeanimation für den Login-Button --- */
+.loginbutton.loading {
+    position: relative; /* Position relativ für das Spinner-Element */
+    pointer-events: none; /* Verhindert weitere Klicks */
+}
+
+.loginbutton.loading::after {
+    content: ''; /* Spinner-Element */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px; /* Spinner-Größe */
+    height: 20px;
+    border: 3px solid var(--text-on-primary); /* Spinner-Farbe */
+    border-top: 3px solid transparent; /* Transparent für den Spinner-Effekt */
+    border-radius: 50%; /* Rund */
+    animation: spin 0.6s linear infinite; /* Animation */
+    transform: translate(-50%, -50%); /* Zentrieren */
+}
+
+/* Spinner-Animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* --- Fehlerzustand für den Login-Button --- */
+.loginbutton.error {
+    background-color: var(--danger-color); /* Rote Hintergrundfarbe */
+    color: white; /* Weißer Text für bessere Lesbarkeit */
+    border: 1px solid var(--danger-color); /* Roter Rand */
+}
+
 /* Sekundär/Register-Button */
 .registerbutton {
     background-color: var(--accent-color); /* Helles Business-Blau */
@@ -335,7 +368,7 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
     bottom: 0;
     left: 0;
     width: 100%;
-    height: var(--nav-height);
+    height: calc(var(--nav-height) + 10px); /* Erhöhte Höhe */
     background-color: var(--bg-color);
     display: flex;
     justify-content: space-around;
@@ -344,6 +377,7 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
     z-index: 1000;
     border-top: 1px solid var(--card-border);
     transition: transform 0.3s ease-in-out;
+    padding: 5px 0; /* Padding hinzufügen, um Abstand zu schaffen */
 }
 
 body.nav-hidden .bottom-nav {
@@ -360,8 +394,8 @@ body.nav-hidden .bottom-nav {
     justify-content: center;
     flex-grow: 1;
     height: 100%;
-    padding: 5px 0;
-    font-size: 0.75em;
+    padding: 10px 0; /* Mehr Padding für mehr Abstand */
+    font-size: 0.85em; /* Schriftgröße anpassen */
     cursor: pointer;
     transition: color 0.2s ease;
 }

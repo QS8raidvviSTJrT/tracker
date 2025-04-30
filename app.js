@@ -166,16 +166,30 @@ function resetAppState() {
 }
 
 
-        window.login = async function() {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
+window.login = async function() {
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
     clearError(); // Vorherige Fehler löschen
+
+    const loginButton = document.getElementById('login');
+    loginButton.disabled = true; // Button deaktivieren
+    loginButton.classList.add('loading'); // Ladeanimation hinzufügen
+
     try {
         const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+            // Überprüfen, ob der Fehlerstatus 400 ist
+            if (error.status === 400) {
+                loginButton.classList.add('error'); // Füge die Fehlerklasse hinzu
+            }
+            throw error; // Fehler weiterwerfen
+        }
         // onAuthStateChange behandelt das Anzeigen der App
     } catch (error) {
         showError('Fehler beim Login: ' + error.message);
+    } finally {
+        loginButton.disabled = false; // Button wieder aktivieren
+        loginButton.classList.remove('loading'); // Ladeanimation entfernen
     }
 };
 
@@ -253,18 +267,22 @@ async function getPostalCodeFromLocation() {
             clearError();
             try {
                 const postalCode = await reverseGeocode(latitude, longitude);
-                if (postalCode) plzInput.value = postalCode;
+                if (postalCode) {
+                    plzInput.value = postalCode;
+                    // Automatisches Drücken des Suchbuttons
+                    searchStreets(); // Sofortige Suche auslösen
+                }
             } catch (error) {
                 console.warn("Fehler beim Reverse Geocoding:", error);
             } finally {
-                 loadingIndicator.style.display = 'none';
-                 loadingIndicator.textContent = "Lade Straßen..."; // Zurücksetzen
+                loadingIndicator.style.display = 'none';
+                loadingIndicator.textContent = "Lade Straßen..."; // Zurücksetzen
             }
         },
         (error) => {
             console.warn("Standortabfrage fehlgeschlagen:", error.message);
-             loadingIndicator.style.display = 'none'; // Sicherstellen, dass aus
-             loadingIndicator.textContent = "Lade Straßen...";
+            loadingIndicator.style.display = 'none'; // Sicherstellen, dass aus
+            loadingIndicator.textContent = "Lade Straßen...";
         },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     );
