@@ -137,7 +137,7 @@ function showApp() {
     appContainer.style.display = 'flex';
     getPostalCodeFromLocation(); // Versuche PLZ zu holen
     // Standardansicht beim Laden der App anzeigen
-    switchView('mainView', 'Straßen'); // Startet mit der Hauptansicht
+    switchView('mainView', 'SellX Solutions'); // Startet mit der Hauptansicht
     // === STELLT SICHER, DASS LISTENER HINZUGEFÜGT WERDEN ===
     setupInputFocusListeners();
     // === ENDE ===

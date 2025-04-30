@@ -1,7 +1,7 @@
 {
-    "name": "10th",
-    "short_name": "10th",
-    "description": "A simple app to keep track of your givings to church",
+    "name": "SellX",
+    "short_name": "SellX",
+    "description": "A simple app to keep track of your door to door sales",
 
     "start_url": "/",
     "display": "standalone",
