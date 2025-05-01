@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-touch-fullscreen" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Expo" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Passwort zurücksetzen</title>
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+    --primary-color: #131313;
+    --background-color: #131313;
+    --card-background: #1A1A1A;
+    --text-color: #E8E8E8;
+    --success-color: #34C759;
+    --danger-color: #FF3B30;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+    background-color: var(--background-color);
+    min-height: 100vh;
+    padding: 20px;
+    touch-action: pan-x pan-y;
+    color: var(--text-color);
+}
+
+        .container {
+            max-width: 400px;
+    margin: auto;
+    padding: 30px;
+    background: var(--card-background);
+    border-radius: 20px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    text-align: center;
+        }
+
+        h1 {
+            color: var(--text-color);
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+            margin-top: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .back {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: transparent;
+            color: white;
+            margin-top: 1rem;
+            border: 2px solid #000000;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .back a {
+            text-decoration: none;
+            color: var(--text-color);
+        }
+
+        .message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Email Request Page -->
+    <div id="requestPage" class="container page">
+        <h1>Du hast dein Passwort vergessen?</h1>
+        <p>Wir schicken dir einen Link, mit welchem du dein Passwort zurücksetzen kannst.</p>
+        <div class="form-group">
+            <input type="email" id="email" required placeholder="E-Mail-Adresse">
+        </div>
+        <button onclick="requestReset()">Link anfordern</button>
+        <a href="/"><button class="back">Zurück zur Anmeldung</button></a>
+        <div id="requestMessage" class="message" style="display: none;"></div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://cnhtbonckcbhqisvcnye.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRib25ja2NiaHFpc3ZjbnllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NDkxNDIsImV4cCI6MjA1MTUyNTE0Mn0.0pDchqR5hD-NIoqlgeGYDCmQW2yCRwME_S0tjo8nd88'
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+
+        // Reset-Link anfordern
+        async function requestReset() {
+            const email = document.getElementById('email').value;
+            try {
+                const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: 'https://tracker.sellxsolutions.de/recovery/update'
+                });
+
+                if (error) throw error;
+
+                showMessage('requestMessage', 'Die E-Mail ist auf dem Weg zu dir. Drücke auf den Button in der E-Mail um ein neues Passwort festzulegen.', 'success');
+            } catch (error) {
+                console.error('Fehler beim Anfordern des Reset-Links:', error.message);
+                showMessage('requestMessage', 'Fehler beim Senden des Reset-Links.', 'error');
+            }
+        }
+
+       
+
+        // Hilfsfunktion für Nachrichten
+        function showMessage(elementId, text, type) {
+            const message = document.getElementById(elementId);
+            message.textContent = text;
+            message.className = `message ${type}`;
+            message.style.display = 'block';
+        }
+
+   
+    </script>
+</body>
+</html>
