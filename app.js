@@ -144,6 +144,7 @@ function showApp() {
     getPostalCodeFromLocation(); // Versuche PLZ zu holen
     // Standardansicht beim Laden der App anzeigen
     switchView('mainView', 'SellX Solutions'); // Startet mit der Hauptansicht
+    updateGreetingPlaceholder(); // NEU: Platzhalter-Begrüßung aktualisieren
     // === STELLT SICHER, DASS LISTENER HINZUGEFÜGT WERDEN ===
     setupInputFocusListeners();
     // === ENDE ===
@@ -539,7 +540,7 @@ function renderStreetDetailView(streetName) {
     formDiv.innerHTML = `
         <h5>Neuer Eintrag / Bearbeiten</h5>
         <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-            <input type="text" id="houseNumberInput" placeholder="Hausnummer" required style="flex-grow: 1; ${inputStyle}">
+            <input type="text" id="houseNumberInput" placeholder="Hausnummer" required inputmode="numeric" style="flex-grow: 1; ${inputStyle}">
             <input type="text" id="nameInput" placeholder="Name" style="flex-grow: 1; ${inputStyle}">
         </div>
         <select id="statusSelect" style="width: 100%; margin-bottom: 12px; ${inputStyle}">
@@ -559,6 +560,7 @@ function renderStreetDetailView(streetName) {
 
     // === NEU: Enter-Listener für Formularfelder hinzufügen ===
     const houseNumberInput = formDiv.querySelector('#houseNumberInput');
+    const nameInput = formDiv.querySelector('#nameInput'); // Hinzugefügt für Vollständigkeit, falls Enter dort auch speichern soll
     const notesInput = formDiv.querySelector('#notesInput');
     const statusSelect = formDiv.querySelector('#statusSelect');
 
@@ -575,9 +577,17 @@ function renderStreetDetailView(streetName) {
     };
 
     if(houseNumberInput) houseNumberInput.addEventListener('keydown', formEnterHandler);
+    if(nameInput) nameInput.addEventListener('keydown', formEnterHandler);
     if(notesInput) notesInput.addEventListener('keydown', formEnterHandler);
     if(statusSelect) statusSelect.addEventListener('keydown', formEnterHandler);
     // === ENDE NEU ===
+
+    // Fokus auf Hausnummernfeld setzen
+    if (houseNumberInput) {
+        setTimeout(() => { // setTimeout gibt dem Browser Zeit, das Element sicher zu rendern
+            houseNumberInput.focus();
+        }, 100);
+    }
 
     // Liste für vorhandene Einträge
     const listDiv = document.createElement('div');
@@ -669,8 +679,18 @@ async function saveOrUpdateHouseEntry() {
     }
 
     clearError();
-    loadingIndicator.textContent = "Speichere Eintrag...";
-    loadingIndicator.style.display = 'block';
+    
+    const saveButton = streetDetailContainer.querySelector('#houseEntryForm button:nth-of-type(1)');
+    const originalButtonText = saveButton ? saveButton.textContent : 'Speichern';
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.textContent = 'Speichert...';
+        saveButton.classList.add('saving'); // Für Styling, falls gewünscht
+    } else {
+        loadingIndicator.textContent = "Speichere Eintrag...";
+        loadingIndicator.style.display = 'block';
+    }
+
 
     const entryDataForUpdate = { // Daten, die bei jedem Update gesetzt werden
         street_id: currentSelectedStreetId,
@@ -730,15 +750,43 @@ async function saveOrUpdateHouseEntry() {
         }
 
         console.log("Eintrag erfolgreich gespeichert/aktualisiert.");
+
+        // Kurze Vibration, falls unterstützt
+        if (navigator.vibrate) {
+            navigator.vibrate(100); // 100ms Vibration
+        }
+
+        // Visuelles Feedback am Button
+        if (saveButton) {
+            saveButton.textContent = 'Gespeichert ✓';
+            saveButton.classList.remove('saving');
+            saveButton.classList.add('saved'); // Für anderes Styling, falls gewünscht
+            setTimeout(() => {
+                saveButton.textContent = originalButtonText;
+                saveButton.disabled = false;
+                saveButton.classList.remove('saved');
+            }, 1500); // Zurücksetzen nach 1.5 Sekunden
+        }
+        
         clearHouseEntryForm();
-        await loadHouseEntries(currentSelectedStreetId); // Lädt auch die neuen Spalten, wenn SELECT * ist
+        await loadHouseEntries(currentSelectedStreetId); 
         displayHouseEntries();
 
     } catch (error) {
         console.error("Fehler beim Speichern/Aktualisieren:", error);
         showError(`Fehler beim Speichern: ${error.message}`);
+        if (saveButton) { // Fehler auch am Button anzeigen oder zurücksetzen
+            saveButton.textContent = originalButtonText;
+            saveButton.disabled = false;
+            saveButton.classList.remove('saving');
+        }
     } finally {
-        loadingIndicator.style.display = 'none';
+        if (!saveButton) { // Nur wenn der globale Ladeindikator verwendet wurde
+            loadingIndicator.style.display = 'none';
+        }
+        // Stelle sicher, dass der Button im Fehlerfall (wenn nicht oben schon passiert)
+        // oder wenn er nicht für das Feedback verwendet wurde, wieder aktiviert wird.
+        // Dies wird teilweise schon im catch-Block gehandhabt.
     }
 }
 
@@ -914,6 +962,7 @@ window.switchView = function(viewIdToShow, viewTitle) {
             break;
         case 'mainView':
              console.log("[switchView] Aktiviere Hauptansicht");
+             updateGreetingPlaceholder(); // NEU: Platzhalter-Begrüßung aktualisieren
              if (streetDetailContainer.style.display !== 'none') { backToStreetList(); }
             break;
     }
@@ -1080,6 +1129,18 @@ function filterStreetsByLetter(letter) {
 }
 
 // === ENDE NEUE FUNKTIONEN ===
+
+// NEUE FUNKTION: Aktualisiert den Begrüßungstext im Platzhalter
+function updateGreetingPlaceholder() {
+    const greetingHeader = document.querySelector('#streetListPlaceholder .placeholder-greeting h3');
+    if (greetingHeader) {
+        if (currentUser && currentUser.user_metadata && currentUser.user_metadata.display_name) {
+            greetingHeader.textContent = `Willkommen, ${escapeHtml(currentUser.user_metadata.display_name)}!`;
+        } else {
+            greetingHeader.textContent = 'Willkommen!';
+        }
+    }
+}
 
 // --- Ladefunktionen für die Views ---
 
@@ -1256,96 +1317,109 @@ function renderStatusChart(statusCounts) {
     if (!statusChartCanvas) return;
     const ctx = statusChartCanvas.getContext('2d');
 
-    // Zerstöre alte Instanz, falls vorhanden, und setze die Referenz zurück
     if (statsChartInstance) {
         statsChartInstance.destroy();
         statsChartInstance = null;
     }
 
-    // Bereite Daten für Chart.js vor
-    const labels = Object.keys(statusCounts).filter(status => status !== 'null' && statusCounts[status] > 0);
-    const dataValues = labels.map(label => statusCounts[label]);
+    const definedCategories = ['Geschrieben', 'Kein Interesse', 'Nicht geöffnet', 'Andere'];
+    let chartLabels = [];
+    let chartDataValues = [];
+    let chartBackgroundColors = [];
 
-    // Wenn keine Daten vorhanden sind, zeige eine Nachricht an und rendere das Chart nicht
-    if (labels.length === 0) {
-        console.warn("Keine Daten für das Status-Chart vorhanden. Chart wird nicht gerendert.");
-        ctx.clearRect(0, 0, statusChartCanvas.width, statusChartCanvas.height); // Canvas leeren
-        // Nachricht auf dem Canvas anzeigen
-        ctx.font = "16px Segoe UI, Arial, sans-serif"; // Passende Schriftart
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-color-muted').trim() || "#6c757d"; // Dynamische Textfarbe
+    // Funktion, um berechnete Farbwerte zu erhalten
+    const getComputedColor = (cssVar, fallbackColor) => {
+        try {
+            const color = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+            return color || fallbackColor;
+        } catch (e) {
+            console.warn(`Konnte CSS-Variable ${cssVar} nicht lesen, verwende Fallback ${fallbackColor}`, e);
+            return fallbackColor;
+        }
+    };
+
+    const categoryColors = {
+        'Geschrieben': getComputedColor('--success-color', '#16a34a'),
+        'Kein Interesse': getComputedColor('--danger-color', '#dc2626'),
+        'Nicht geöffnet': getComputedColor('--warning-color', '#f59e0b'),
+        'Andere': getComputedColor('--info-color', '#0284c7')
+    };
+
+    definedCategories.forEach(category => {
+        let count = 0;
+        if (category === 'Andere') {
+            count = (statusCounts['Andere'] || 0) + (statusCounts['null'] || 0);
+        } else {
+            count = statusCounts[category] || 0;
+        }
+
+        if (count > 0) {
+            chartLabels.push(category);
+            chartDataValues.push(count);
+            chartBackgroundColors.push(categoryColors[category] || '#6b7280');
+        }
+    });
+
+    if (chartLabels.length === 0) {
+        console.warn("Keine Daten für das Status-Chart vorhanden (alle relevanten Kategorien sind 0). Chart wird nicht gerendert.");
+        ctx.clearRect(0, 0, statusChartCanvas.width, statusChartCanvas.height);
+        let textColor = getComputedColor('--text-color-muted', '#6c757d');
+        ctx.font = "16px Segoe UI, Arial, sans-serif";
+        ctx.fillStyle = textColor;
         ctx.textAlign = "center";
         ctx.fillText("Keine Daten für Diagramm vorhanden", statusChartCanvas.width / 2, statusChartCanvas.height / 2);
-        return; // Wichtig: Funktion hier beenden
+        return;
     }
 
-    // Farben für die Segmente (Beispiel, anpassen!)
-    const backgroundColors = [
-        'var(--success-color, #16a34a)', // Geschrieben (Grün)
-        'var(--danger-color, #dc2626)',  // Kein Interesse (Rot)
-        'var(--warning-color, #f59e0b)', // Nicht geöffnet (Gelb/Orange)
-        'var(--info-color, #0284c7)'    // Andere (Helles Blau) / oder ein neutrales Grau
-    ];
-     // Sicherstellen, dass wir genug Farben haben (ggf. wiederholen)
-     const chartColors = dataValues.map((_, index) => {
-        const statusName = labels[index];
-        switch(statusName) {
-            case 'Geschrieben': return backgroundColors[0];
-            case 'Kein Interesse': return backgroundColors[1];
-            case 'Nicht geöffnet': return backgroundColors[2];
-            case 'Andere': return backgroundColors[3];
-            default: return '#6b7280'; // Fallback Grau
-        }
-     });
-
-    // Definiere die Hintergrundfarbe aus den CSS Variablen (oder hardcode sie)
-    // const cardBgColor = getComputedStyle(document.documentElement).getPropertyValue('--card-bg').trim() || '#f8fafc'; // Dynamisch holen
-    const cardBgColor = '#f8fafc'; // Statischer Wert (einfacher)
+    const cardBgColor = getComputedColor('--card-bg', '#f8fafc');
+    const legendTextColor = getComputedColor('--text-color', '#1e293b');
 
     statsChartInstance = new Chart(ctx, {
-        type: 'pie', // oder 'doughnut' oder 'bar'
+        type: 'pie',
         data: {
-            labels: labels,
+            labels: chartLabels,
             datasets: [{
                 label: 'Status Verteilung',
-                data: dataValues,
-                backgroundColor: chartColors,
-                // === FIX 1: Verwende den JS-Wert oder einen statischen Wert ===
-                borderColor: cardBgColor, // Hintergrundfarbe für Ränder
-                borderWidth: 1
+                data: chartDataValues,
+                backgroundColor: chartBackgroundColors,
+                borderColor: cardBgColor,
+                borderWidth: 2
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true, // Passt Höhe/Breite an
-             plugins: {
-                 legend: {
-                     position: 'bottom', // Legende unten
-                     labels: {
-                          padding: 15 // Mehr Abstand für Legende
-                     }
-                 }, // === FIX 2: Komma nach dem legend-Objekt hinzugefügt ===
-                 tooltip: {
-                     callbacks: {
-                         // === FIX 3: Funktion in Kurzform oder sicherstellen, dass Syntax korrekt ist (war eigentlich ok) ===
-                         label: function(context) {
-                             let label = context.label || '';
-                             if (label) {
-                                 label += ': ';
-                             }
-                             if (context.parsed !== null) {
-                                 label += context.parsed;
-                             }
-                             // Optional: Prozent anzeigen
-                             // const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                             // const percentage = ((context.parsed / total) * 100).toFixed(1) + '%';
-                             // label += ` (${percentage})`;
-                             return label;
-                         } // Ende label callback
-                     } // Ende callbacks
-                 } // Ende tooltip
-             } // Ende plugins
-        } // Ende options
-    }); // Ende new Chart
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        color: legendTextColor
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            const value = context.parsed || 0;
+                            label += value;
+
+                            // Prozentsatz berechnen und hinzufügen
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            if (total > 0) {
+                                const percentage = ((value / total) * 100).toFixed(1) + '%';
+                                label += ` (${percentage})`;
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 
