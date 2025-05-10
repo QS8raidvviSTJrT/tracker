@@ -1,96 +1,52 @@
-const supabaseUrl = 'https://pvjjtwuaofclmsvsaneo.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2amp0d3Vhb2ZjbG1zdnNhbmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5OTQyOTQsImV4cCI6MjA2MTU3MDI5NH0.zTde0H29V-_uTvrrwv6Zr3lXhw6zfpP0-IfO0SXiDYw'
+        const supabaseUrl = 'https://cnhtbonckcbhqisvcnye.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRib25ja2NiaHFpc3ZjbnllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NDkxNDIsImV4cCI6MjA1MTUyNTE0Mn0.0pDchqR5hD-NIoqlgeGYDCmQW2yCRwME_S0tjo8nd88'
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
         let deferredPrompt;
-let currentUser = null;
-let currentSelectedStreetId = null; // ID der aktuell ausgewählten Straße
-let currentHouseEntries = []; // Einträge für die aktuell ausgewählte Straße
-let currentEditingEntryId = null; // ID des Eintrags, der gerade bearbeitet wird
-let statsChartInstance = null; // Variable für die Chart-Instanz
-let currentAlphabetFilter = null; // Aktuell ausgewählter Buchstabe
 
-// --- DOM Elemente ---
-const loginContainer = document.getElementById('loginContainer');
-const appContainer = document.getElementById('appContainer');
-const plzInput = document.getElementById('plzInput');
-const streetListContainer = document.getElementById('streetListContainer');
-const streetDetailContainer = document.getElementById('streetDetailContainer');
-const searchStreetButton = document.getElementById('searchStreetButton');
-const loadingIndicator = document.getElementById('loadingIndicator');
-const errorDisplay = document.getElementById('errorDisplay');
-
-// NEU: Referenzen für Views und Navigationsleiste
-const viewContainer = document.getElementById('viewContainer');
-const views = document.querySelectorAll('.view'); // Alle Elemente mit der Klasse 'view'
-const navItems = document.querySelectorAll('.nav-item'); // Alle Navigations-Buttons
-const currentViewTitleElement = document.getElementById('currentViewTitle'); // Element für den Titel
-
-// --- DOM Elemente für neue Views ---
-const statsLoadingIndicator = document.getElementById('statsLoadingIndicator');
-const statsErrorDisplay = document.getElementById('statsErrorDisplay');
-const statsContent = document.getElementById('statsContent');
-const statTotalEntries = document.getElementById('statTotalEntries');
-const statCompletedEntries = document.getElementById('statCompletedEntries');
-const statInterestedEntries = document.getElementById('statInterestedEntries');
-const statNotInterestedEntries = document.getElementById('statNotInterestedEntries');
-const statRevisitEntries = document.getElementById('statRevisitEntries');
-const statNotMetEntries = document.getElementById('statNotMetEntries');
-const statusChartCanvas = document.getElementById('statusChart');
-
-const leaderboardLoadingIndicator = document.getElementById('leaderboardLoadingIndicator');
-const leaderboardErrorDisplay = document.getElementById('leaderboardErrorDisplay');
-const leaderboardContent = document.getElementById('leaderboardContent');
-const leaderboardTableBody = document.querySelector('#leaderboardTable tbody');
-
-const settingsLoadingIndicator = document.getElementById('settingsLoadingIndicator');
-const settingsErrorDisplay = document.getElementById('settingsErrorDisplay');
-const settingsContent = document.getElementById('settingsContent');
-const displayNameInput = document.getElementById('displayNameInput');
-const saveSettingsButton = document.getElementById('saveSettingsButton');
-const settingsStatus = document.getElementById('settingsStatus');
-
-const streetListPlaceholder = document.getElementById('streetListPlaceholder'); // Referenz zum Platzhalter
-const alphabetFilterContainer = document.getElementById('alphabetFilterContainer'); // NEU
-
-// --- PWA Installationslogik ---
         function isIos() {
-    const userAgent = navigator.userAgent;
-    return /iPhone|iPad|iPod/.test(userAgent) || (userAgent.includes("Mac") && "ontouchend" in document);
+            // Überprüfung auf iOS-Geräte ohne navigator.platform
+            const userAgent = navigator.userAgent
+            return /iPhone|iPad|iPod/.test(userAgent) || 
+                   (userAgent.includes("Mac") && "ontouchend" in document);
         }
         
         function isInStandaloneMode() {
+            // Prüft, ob die App im Standalone-Modus läuft
             return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         }
 
         window.addEventListener('load', () => {
             const installPopup = document.getElementById('installPopup');
-    if (!installPopup) return; // Falls Element nicht existiert
-
             const installMessage = document.getElementById('installMessage');
             const installButton = document.getElementById('installButton');
             const isAppInstalled = isInStandaloneMode();
 
         if (isAppInstalled) {
             installPopup.style.display = 'none';
-        return;
+            return; // Popup nicht anzeigen, wenn die App installiert ist
         }
 
         if (isIos()) {
             installPopup.style.display = 'flex';
             installMessage.innerHTML = 'Um diese App zu installieren, tippe auf <span class="material-icons" style="vertical-align: 1%; font-size: 1.2rem;">ios_share</span> und suche nach "Zum Home-Bildschirm <span class="material-symbols-outlined" style="vertical-align: top; font-size: 1.2rem;">add_box</span>"';
-        installButton.style.display = 'none';
+            installButton.style.display = 'none'; // Verberge den Install-Button für iOS
         } else {
+            console.log("Kein iOS-Gerät oder nicht Safari erkannt.");
+            console.log(navigator.userAgent)
             window.addEventListener('beforeinstallprompt', (e) => {
                 e.preventDefault();
                 deferredPrompt = e;
-            installPopup.style.display = 'flex'; // Zeige Popup erst, wenn Prompt verfügbar
+                installPopup.style.display = 'flex';
             });
 
             installButton.addEventListener('click', () => {
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
                     deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('Benutzer hat das Installations-Popup akzeptiert.');
+                        }
                         deferredPrompt = null;
                         installPopup.style.display = 'none';
                     });
@@ -99,1272 +55,392 @@ const alphabetFilterContainer = document.getElementById('alphabetFilterContainer
         }
     });
 
-// --- Session & Auth ---
+        // document.getElementById('closePopupButton').addEventListener('click', () => {
+        //    document.getElementById('installPopup').style.display = 'none';
+        // });
+
+
+        const audioBase64 = `data:audio/mp3;base64,//uQRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAAB/hQAACAAADSCgAAE/5hb aqZg2IP+gPCAHIRAMkkc/xgAggDDCOaz32Pf8xCBIEgGa2E+ZKhL/++1Ru40BZiGCphQNn//rXGg KLkmC4CmTA3/+9BkIgALJ4TJBnegAAAADSDAAAAPMV9P/aQACAAANIOAAAQGEgtGPZumHxif//4Q J5fEwXAcoEYwCA8zrLwx8JswxHoxpM4xjc////8w7BswhAOGS+YODAuWZzlQcglgbjBca+n6ZAkm Y7Dt////8aSQZXA8MPCwcxLE0wtBsw6BQwnA8VAgwGB0wRAL/////9v5a48D2Kd+44/BhaCxgwBI sDRcZCegkXKHBELBJ///////zcBMEqvUtSHWZIDFCFgjCgHTDUGDEAAjEoEzEUBAgbDDYHzCkKDA gJzEgZTEscP/////////wcBi9G6KWQOyBklmDHEimqTvmMwEmWQilZTmRQfCxEBBFmGABGEgCmD4 BEwYA4NQ4EgwFBIAFj////////////////////fzw///////////////2sUEvciz+SLGAAYpQCZm ofA4szFMVhpc1eABAIOLwZknMyow4gODHNFKXMuCEmWBscSP9SRUPTYKFlhtSRUVFRa5qG/ZryQ5 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 8P49TnmgFygAAA0gAAABBCxFNeCBpKAAADSAAAAEAA44AAA+gid//oDACxCR+w8h6/AIgGoB//YS sVn/Xkp9TEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBk+oDw7xBO+CBouAAA DSAAAAEDhEE94IFCwAAANIAAAARVVVUAUC8AcYAAAU/QYr/+oYgfYEi/T0hAASn//OAACVJMQU1F My45OS41qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7EGT3CfD0EU54DWLIAAANIAAAAQKEQT3g KYsgAAA0gAAABKqqqqqqAgAFAFAAAAHqJjf/oBoBAjaZBB//1AnCF/1ak0xBTUUzLjk5LjVVVVVV VVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQZPUB8NUQzXgNeVgAAA0gAAABAohDNcCBpKAAADSAAAAE VVVVVVVVAAICIAAO//qE0K6fiuRHoTBf/zgJAPN+GVXoTEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVV VVVVVVVVVVVVVVX/+xBk8wnw3BDNaA1heAAADSAAAAEB5EM34DVKYAAANIAAAARVVVVVVVVVAAMD MAAf/+gTgY39/UQEYGf/1CWEXfhI5pVMQU1FMy45OS41VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV Vf/7EGTqjfB/EE1wClrKAAANIAAAAQEsQTZgNYzoAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVXI AA6hJBvEfI9PQJg7FUxBTUUzLjk5LjVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//sQZPCB8JIQ TPgCUooAAA0gAAABAlxBK6UBrmAAADSAAAAEVVVVVVVVVVVVVVVVVYAl9ACg5/yX////57/////r 8FVVTEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBk8AnwuBDM+CBROAAADSAA AAEBuEEnQAmqYAAANIAAAARVVVVVACAFM7wGI/////qb+n///1aqBMn////7/////lVMQU1FMy45 OS41VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/7EGTsifClEMxoCmF4AAANIAAAAQEgQyaAHWzw AAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/8SkxBTUUzLjk5LjWqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqq//sQZOuJ8I4RSuggUToAAA0gAAABAURBJKAFTDAAADSAAAAEqqqq qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqTEFNRTMuOTkuNaqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqr/+xBk6wnweRDKyApjPAAADSAAAAEBfEMiwAVMIAAANIAAAASqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqqqqpMQU1FMy45OS41qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7 EGTqifBrEMnICks4AAANIAAAAQGEQyMgKWzgAAA0gAAABKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqkxBTUUzLjk5LjWqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//sQZOSN8E0QyJAK TIgAAA0gAAABAHRDIgAo0jAAADSAAAAEqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq TEFNRTMuOTkuNaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/+xBk543wiBDGiCA48AAADSAAAAEA SEEkAADj8AAANIAAAASqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqpMQU1FMy45OS41 qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7EGTsD/CFEEaoAGD0AAANIAAAAQGEQRwAAUPQAAA0 gAAABKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqkxBTUUzLjk5LjWqqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqq//sQZN8P8BcAxoAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqTEFNRTMuOTkuNaqqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqr/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAASqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqpMQU1FMy45OS41qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7EGTd j/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqkxBTUUzLjk5LjWqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//sQZN2P8AAAaQAAAAgA AA0gAAABAAABpAAAACAAADSAAAAEqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqTEFN RTMuOTkuNaqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGk AAAAIAAANIAAAASqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7EGTdj/AAAGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAA BKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqqqq//sQZN2P8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAEqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq qqr/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAASqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/7EGTdj/AA AGkAAAAIAAANIAAAAQAAAaQAAAAgAAA0gAAABKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//sQZN2P8AAAaQAAAAgAAA0g AAABAAABpAAAACAAADSAAAAEqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/+xBk3Y/wAABpAAAACAAADSAAAAEAAAGkAAAA IAAANIAAAASqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq qqqqqqqqqqqqqqqqqqqqqqqqqg==`;
+        const audioApplePay = new Audio(audioBase64);
+
+        let currentUser = null;
+        let currentMonthData = {
+                income: 0,
+                requiredDonation: 0,
+                actualDonation: 0
+        };
+        
+        const amountInput = document.getElementById('amount');
+
+        function addNumber(num) {
+            amountInput.value = amountInput.value + num;
+        }
+
+        function clearAmount() {
+            amountInput.value = '';
+        }
+
+        function removeLast() {
+            amountInput.value = amountInput.value.slice(0, -1);
+        }
+
+        // Session-Check-Funktion
         async function checkSession() {
             const { data: { session }, error } = await supabaseClient.auth.getSession();
+            
             if (error) {
                 console.error('Error checking session:', error.message);
-        showLogin(); // Zeige Login bei Fehler
                 return;
             }
+            
             if (session) {
                 currentUser = session.user;
-        showApp();
-    } else {
-        showLogin();
-    }
-}
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('appContainer').style.display = 'block';
+                loadData();
+            }
+        }
 
+        // Auth State Change Listener
         supabaseClient.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN') {
                 currentUser = session.user;
-        showApp();
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('appContainer').style.display = 'block';
+                loadData();
             } else if (event === 'SIGNED_OUT') {
                 currentUser = null;
-        showLogin();
-    }
-});
-
-function showLogin() {
-    loginContainer.style.display = 'block';
-    appContainer.style.display = 'none';
-    // Reset App State
-    resetAppState();
-}
-
-function showApp() {
-    loginContainer.style.display = 'none';
-    appContainer.style.display = 'flex';
-    getPostalCodeFromLocation(); // Versuche PLZ zu holen
-    // Standardansicht beim Laden der App anzeigen
-    switchView('mainView', 'SellX Solutions'); // Startet mit der Hauptansicht
-    // === STELLT SICHER, DASS LISTENER HINZUGEFÜGT WERDEN ===
-    setupInputFocusListeners();
-    // === ENDE ===
-}
-
-function resetAppState() {
-    plzInput.value = '';
-    streetListContainer.innerHTML = '';
-    if (streetListPlaceholder) {
-         streetListContainer.appendChild(streetListPlaceholder);
-         streetListPlaceholder.style.display = 'flex';
-    }
-    streetListContainer.style.display = 'flex';
-    streetDetailContainer.innerHTML = '';
-    streetDetailContainer.style.display = 'none';
-    // === NEU: Alphabet-Filter ausblenden ===
-    if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
-    currentAlphabetFilter = null; // Filter zurücksetzen
-    // === ENDE NEU ===
-    currentSelectedStreetId = null;
-    currentHouseEntries = [];
-    currentEditingEntryId = null;
-    clearError();
-    // Ladeanzeige ausblenden
-    loadingIndicator.style.display = 'none';
-}
-
-
-window.login = async function() {
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    clearError(); // Vorherige Fehler löschen
-
-    const loginButton = document.getElementById('login');
-    loginButton.disabled = true; // Button deaktivieren
-    loginButton.classList.add('loading'); // Ladeanimation hinzufügen
-
-    try {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) {
-            // Überprüfen, ob der Fehlerstatus 400 ist
-            if (error.status === 400) {
-                loginButton.classList.add('error'); // Füge die Fehlerklasse hinzu
+                document.getElementById('loginContainer').style.display = 'block';
+                document.getElementById('appContainer').style.display = 'none';
             }
-            throw error; // Fehler weiterwerfen
-        }
-        // onAuthStateChange behandelt das Anzeigen der App
-    } catch (error) {
-        showError('Fehler beim Login: ' + error.message);
-    } finally {
-        loginButton.disabled = false; // Button wieder aktivieren
-        loginButton.classList.remove('loading'); // Ladeanimation entfernen
-    }
-};
+        });
 
+        // Login Funktion
+        window.login = async function() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email,
+                password
+            });
+
+            if (error) {
+                alert('Fehler beim Login: ' + error.message);
+                return;
+            }
+        };
+
+        // Register Funktion
         window.register = async function() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
-    clearError();
-    try {
-        const { error } = await supabaseClient.auth.signUp({ email, password });
-        if (error) throw error;
-        alert('Registrierung erfolgreich! Bitte E-Mail-Adresse bestätigen und erneut einloggen.');
-        // Zurück zum Login-Interface
-        document.getElementById('register').classList.add('hidden');
-        document.getElementById('login').classList.remove('hidden');
-        const registerLink = document.getElementById('registerText');
-        if(registerLink) registerLink.style.display = 'block'; // Zeige "Neu hier?" wieder an
-        const existingAccountLink = document.querySelector('#loginContainer > div > a[href="/"]');
-         if (existingAccountLink) existingAccountLink.parentElement.remove(); // Entferne "Bereits ein Konto?"
+            
+            const { data, error } = await supabaseClient.auth.signUp({
+                email,
+                password
+            });
 
-    } catch (error) {
-        showError('Registrierung fehlgeschlagen: ' + error.message);
-    }
-};
-
-        window.logout = async function() {
-    clearError();
-    try {
-            const { error } = await supabaseClient.auth.signOut();
-        if (error) throw error;
-        // onAuthStateChange behandelt das Anzeigen des Logins
-    } catch (error) {
-        showError('Fehler beim Logout: ' + error.message);
-    }
-};
-
-// Wechsle zwischen Login und Registrieren Ansicht
-window.registerNow = function() {
-    document.getElementById('register').classList.remove('hidden');
-    document.getElementById('login').classList.add('hidden');
-    const registerLink = document.getElementById('registerText');
-    if (registerLink) registerLink.style.display = 'none';
-
-    // Füge Link hinzu, um zum Login zurückzukehren, falls nicht schon vorhanden
-    if (!document.querySelector('#loginContainer > div > a[href="/"]')) {
-        const loginLinkDiv = document.createElement('div');
-        loginLinkDiv.style.marginTop = '10px'; // Etwas Abstand
-        loginLinkDiv.innerHTML = `<a href="#" onclick="showLoginInterface(); return false;" style="text-decoration: none; color: var(--text-color);">Du hast bereits ein Konto? <u>Anmelden</u></a>`;
-        document.getElementById('loginContainer').appendChild(loginLinkDiv);
-    }
-    document.getElementById('resetText').style.display = 'none'; // Passwort vergessen ausblenden
-};
-
-// Funktion, um von Registrieren zu Login zurückzuwechseln
-window.showLoginInterface = function() {
-    document.getElementById('register').classList.add('hidden');
-    document.getElementById('login').classList.remove('hidden');
-    const registerLink = document.getElementById('registerText');
-    if (registerLink) registerLink.style.display = 'block';
-    const existingAccountLink = document.querySelector('#loginContainer > div > a[href="#"]');
-    if (existingAccountLink) existingAccountLink.parentElement.remove();
-     document.getElementById('resetText').style.display = 'block'; // Passwort vergessen einblenden
-};
-
-
-// --- Standort & PLZ ---
-async function getPostalCodeFromLocation() {
-    if (!navigator.geolocation) return;
-    // loadingIndicator.textContent = "Ermittle Standort..."; // Weniger aufdringlich
-    // loadingIndicator.style.display = 'block';
-    navigator.geolocation.getCurrentPosition(
-        async (position) => {
-            const { latitude, longitude } = position.coords;
-            loadingIndicator.textContent = "Ermittle PLZ...";
-            loadingIndicator.style.display = 'block';
-            clearError();
-            try {
-                const postalCode = await reverseGeocode(latitude, longitude);
-                if (postalCode) {
-                    plzInput.value = postalCode;
-                    // Automatisches Drücken des Suchbuttons
-                    searchStreets(); // Sofortige Suche auslösen
-                }
-            } catch (error) {
-                console.warn("Fehler beim Reverse Geocoding:", error);
-            } finally {
-                loadingIndicator.style.display = 'none';
-                loadingIndicator.textContent = "Lade Straßen..."; // Zurücksetzen
+            if (error) {
+                alert('Registrierung fehlgeschlagen: ' + error.message);
+                return;
             }
-        },
-        (error) => {
-            console.warn("Standortabfrage fehlgeschlagen:", error.message);
-            loadingIndicator.style.display = 'none'; // Sicherstellen, dass aus
-            loadingIndicator.textContent = "Lade Straßen...";
-        },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
-    );
-}
 
-async function reverseGeocode(lat, lon) {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&addressdetails=1&accept-language=de`;
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`Nominatim Fehler: ${response.status}`);
-        const data = await response.json();
-        if (data.address && data.address.postcode) {
-            const plz = Array.isArray(data.address.postcode) ? data.address.postcode[0] : data.address.postcode;
-            return /^\d{5}$/.test(plz) ? plz : null;
-        }
-        return null;
-    } catch (error) {
-        console.error("Reverse Geocoding Fetch Fehler:", error);
-        return null; // Leise fehlschlagen
-    }
-}
-
-// --- Straßensuche & Auswahl ---
-async function searchStreets() {
-    const plz = plzInput.value.trim();
-    if (!/^\d{5}$/.test(plz)) {
-        showError("Bitte eine gültige 5-stellige PLZ eingeben.");
-        return;
-    }
-
-    clearError();
-    // === PLATZHALTER AUSBLENDEN, LISTE LEEREN & AUSBLENDEN ===
-    if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
-    streetListContainer.innerHTML = ''; // Leert die Liste UND entfernt den Platzhalter (temporär)
-    streetListContainer.style.display = 'none'; // Container ausblenden bis Ergebnisse da sind
-    // === ENDE ÄNDERUNG ===
-    streetDetailContainer.style.display = 'none';
-    loadingIndicator.textContent = "Lade Straßen...";
-    loadingIndicator.style.display = 'block';
-    searchStreetButton.disabled = true;
-
-    const overpassUrl = 'https://overpass-api.de/api/interpreter';
-    const query = `
-        [out:json][timeout:25];
-        area["postal_code"="${plz}"]->.searchArea;
-        ( way(area.searchArea)["highway"]["name"]; );
-        out tags;
-    `;
-     // Alternative Abfrage, falls die erste fehlschlägt (manchmal sind PLZ areas anders getaggt)
-     const queryAlternative = `
-        [out:json][timeout:25];
-        ( relation["boundary"="postal_code"]["postal_code"="${plz}"]; );
-        map_to_area;
-        way(area)["highway"]["name"];
-        out tags;
-     `;
-
-
-    try {
-        let streets = await fetchStreetsWithOverpass(overpassUrl, query);
-         // Wenn erste Abfrage keine Ergebnisse liefert, probiere Alternative
-         if (streets.length === 0) {
-             console.log("Erste Overpass-Abfrage erfolglos, versuche Alternative...");
-             streets = await fetchStreetsWithOverpass(overpassUrl, queryAlternative);
-         }
-
-        // displayStreets macht die Liste (ohne Platzhalter) wieder sichtbar
-        displayStreets(streets, plz);
-
-    } catch (error) {
-        console.error('Fehler beim Abrufen der Straßen:', error);
-        showError(`Fehler beim Abrufen der Straßen: ${error.message}.`);
-        if (error.message.includes("timeout") || error.message.includes("load") || error.message.includes("überlastet")) {
-            showError(errorDisplay.textContent + " API überlastet? Später erneut versuchen.");
-        }
-        // === PLATZHALTER BLEIBT AUSGEBLENDET, DA FEHLER ANGEZEIGT WIRD ===
-        streetListContainer.style.display = 'none'; // Liste bleibt bei Fehler aus
-    } finally {
-        loadingIndicator.style.display = 'none';
-        searchStreetButton.disabled = false;
-    }
-}
-
-async function fetchStreetsWithOverpass(url, query) {
-     const response = await fetch(url, {
-         method: 'POST',
-         body: `data=${encodeURIComponent(query)}`
-     });
-
-     if (!response.ok) {
-         let errorText = `Overpass API Fehler: ${response.status} ${response.statusText}`;
-         try {
-             const errorBody = await response.text();
-             const remarks = errorBody.match(/remark: ([^\<]+)/);
-             if (remarks && remarks[1]) errorText += ` - ${remarks[1].trim()}`;
-         } catch (e) {}
-         // Wenn Status 429 (Too Many Requests) oder 504 (Gateway Timeout), werfe spezifischen Fehler
-         if (response.status === 429 || response.status === 504) {
-             throw new Error("Overpass API ist überlastet (Fehler " + response.status + "). Bitte warte einen Moment und versuche es erneut.");
-         }
-         throw new Error(errorText);
-     }
-
-     const data = await response.json();
-     let streetNames = data.elements
-         .filter(el => el.type === 'way' && el.tags && el.tags.name)
-         .map(el => el.tags.name.trim()) // Trim whitespace
-         // Filtere häufige unerwünschte Einträge (kann erweitert werden)
-         .filter(name => !/^(Bundesautobahn|Bundesstraße|Landstraße|Kreisstraße)/i.test(name) && name.length > 2);
-
-
-     // Eindeutige Straßennamen extrahieren und alphabetisch sortieren
-     return [...new Set(streetNames)].sort((a, b) => a.localeCompare(b, 'de'));
-}
-
-
-function displayStreets(streets, postalCode) {
-    streetListContainer.innerHTML = ''; // Leert alles
-
-    if (streets.length > 0) {
-        // === NEU: Alphabet-Filter rendern und anzeigen ===
-        renderAlphabetFilter();
-        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'flex'; // Als Flex anzeigen
-        // === ENDE NEU ===
-
-         streets.forEach(streetName => {
-            const streetElement = document.createElement('div');
-            streetElement.textContent = streetName;
-            streetElement.className = 'street-item';
-            streetElement.onclick = () => selectStreet(streetName, postalCode);
-            streetListContainer.appendChild(streetElement);
-         });
-    } else {
-        // === NEU: Alphabet-Filter ausblenden ===
-        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
-        // === ENDE NEU ===
-        streetListContainer.innerHTML = '<p style="text-align: center; padding: 20px;">Keine Straßen für diese PLZ gefunden.</p>';
-    }
-
-    streetListContainer.style.display = 'flex'; // Container wieder anzeigen
-}
-
-// --- Hausnummern-Verwaltung ---
-
-async function selectStreet(streetName, postalCode) {
-    console.log(`Ausgewählte Straße: ${streetName}, PLZ: ${postalCode}`);
-    clearError();
-    loadingIndicator.textContent = `Lade Daten für ${streetName}...`;
-    loadingIndicator.style.display = 'block';
-    streetListContainer.style.display = 'none'; // Straßenliste ausblenden
-    // === NEU: Alphabet-Filter ausblenden, wenn Straße ausgewählt wird ===
-    if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
-    // === ENDE NEU ===
-
-    try {
-        // 1. Prüfen, ob Straße für User existiert, sonst anlegen
-        let { data: existingStreet, error: fetchError } = await supabaseClient
-            .from('streets')
-            .select('id')
-            .eq('user_id', currentUser.id)
-            .eq('name', streetName)
-            .eq('postal_code', postalCode) // Prüfe auch PLZ
-            .maybeSingle(); // Gibt null zurück, wenn nicht gefunden, statt Fehler
-
-        if (fetchError) throw fetchError;
-
-        if (existingStreet) {
-            currentSelectedStreetId = existingStreet.id;
-        } else {
-            // Straße neu anlegen
-            const { data: newStreet, error: insertError } = await supabaseClient
-                .from('streets')
-                .insert({
-                    user_id: currentUser.id,
-                    name: streetName,
-                    postal_code: postalCode
-                    // city könnte man auch noch versuchen via Nominatim zu holen
-                })
-                .select('id')
-                .single(); // Erwarten genau ein Ergebnis
-
-            if (insertError) throw insertError;
-            currentSelectedStreetId = newStreet.id;
-            console.log(`Straße "${streetName}" (${postalCode}) mit ID ${currentSelectedStreetId} neu angelegt.`);
-        }
-
-        // 2. Lade Hausnummern-Einträge für diese Straße
-        await loadHouseEntries(currentSelectedStreetId);
-
-        // 3. Zeige Detailansicht mit Hausnummern-Interface
-        renderStreetDetailView(streetName);
-
-    } catch (error) {
-        console.error('Fehler beim Auswählen/Anlegen der Straße oder Laden der Einträge:', error);
-        showError(`Ein Fehler ist aufgetreten: ${error.message}`);
-        backToStreetList(); // Im Fehlerfall zurück zur Liste (zeigt Filter ggf. wieder an)
-    } finally {
-        loadingIndicator.style.display = 'none';
-    }
-}
-
-async function loadHouseEntries(streetId) {
-    if (!streetId) return;
-    try {
-            const { data, error } = await supabaseClient
-            .from('house_entries')
-                .select('*')
-            .eq('street_id', streetId)
-            .order('house_number', { ascending: true }); // Nach Hausnummer sortieren
-
-        if (error) throw error;
-        currentHouseEntries = data || [];
-        console.log(`${currentHouseEntries.length} Hausnummern-Einträge geladen für Street ID ${streetId}`);
-    } catch (error) {
-        console.error('Fehler beim Laden der Hausnummern:', error);
-        showError(`Fehler beim Laden der Hausnummern: ${error.message}`);
-        currentHouseEntries = []; // Im Fehlerfall leeren
-    }
-}
-
-// Rendert die komplette Ansicht für Hausnummern (Eingabe + Liste)
-function renderStreetDetailView(streetName) {
-    streetDetailContainer.innerHTML = ''; // Container leeren
-    streetDetailContainer.style.display = 'block';
-
-    // Überschrift und Zurück-Button
-    const headerDiv = document.createElement('div');
-    headerDiv.style.display = 'flex';
-    headerDiv.style.justifyContent = 'space-between';
-    headerDiv.style.alignItems = 'center';
-    headerDiv.style.marginBottom = '20px';
-    headerDiv.innerHTML = `
-        <h4 id="selectedStreetName" style="margin: 0;">${streetName}</h4>
-        <button onclick="backToStreetList()" class="buttonnumpad" style="padding: 5px 10px; width:auto; height:auto; font-size: 0.9em;">Zurück</button>
-    `;
-    streetDetailContainer.appendChild(headerDiv);
-
-    // Eingabeformular
-    const formDiv = document.createElement('div');
-    formDiv.id = 'houseEntryForm';
-    formDiv.style.marginBottom = '20px';
-    formDiv.style.padding = '15px';
-    formDiv.style.backgroundColor = 'var(--background-color)'; // Etwas abheben
-    formDiv.style.borderRadius = '10px';
-    formDiv.innerHTML = `
-        <h5>Neuer Eintrag / Bearbeiten</h5>
-        <input type="text" id="houseNumberInput" placeholder="Hausnummer" required>
-        <input type="text" id="nameInput" placeholder="Name (optional)"> <!-- Neues Eingabefeld für den Namen -->
-        <select id="statusSelect">
-            <option value="">-- Status --</option>
-            <option value="Nicht angetroffen">Nicht angetroffen</option>
-            <option value="Interessiert">Interessiert</option>
-            <option value="Kein Interesse">Kein Interesse</option>
-            <option value="Erneut besuchen">Erneut besuchen</option>
-            <option value="Abgeschlossen">Abgeschlossen</option>
-            <option value="Andere">Andere</option>
-        </select>
-        <textarea id="notesInput" placeholder="Notizen..."></textarea>
-        <div class="form-button-group">
-            <button onclick="saveOrUpdateHouseEntry()">Speichern</button>
-            <button onclick="clearHouseEntryForm()">Abbrechen/Neu</button>
-        </div>
-    `;
-    streetDetailContainer.appendChild(formDiv);
-
-    // === NEU: Enter-Listener für Formularfelder hinzufügen ===
-    const houseNumberInput = formDiv.querySelector('#houseNumberInput');
-    const notesInput = formDiv.querySelector('#notesInput');
-    // Optional: const statusSelect = formDiv.querySelector('#statusSelect');
-
-    const formEnterHandler = (event) => {
-         if (event.key === 'Enter') {
-              // Bei Enter in Textarea: Nur speichern, wenn NICHT Shift+Enter
-              if (event.target.tagName === 'TEXTAREA' && event.shiftKey) {
-                   return; // Erlaube Zeilenumbruch mit Shift+Enter
-              }
-              event.preventDefault();
-              console.log("Enter in House Entry Form");
-              saveOrUpdateHouseEntry();
-         }
-    };
-
-    if(houseNumberInput) houseNumberInput.addEventListener('keydown', formEnterHandler);
-    if(notesInput) notesInput.addEventListener('keydown', formEnterHandler);
-    // Optional: Listener für Select (weniger üblich, Enter löst normalerweise Auswahl aus)
-    // if(statusSelect) statusSelect.addEventListener('keydown', formEnterHandler);
-    // === ENDE NEU ===
-
-    // Liste für vorhandene Einträge
-    const listDiv = document.createElement('div');
-    listDiv.id = 'houseEntriesList';
-    listDiv.style.marginTop = '20px';
-    streetDetailContainer.appendChild(listDiv);
-
-    // Einträge in die Liste rendern
-    displayHouseEntries();
-}
-
-// Zeigt die aktuellen Hausnummern-Einträge in der Liste an
-function displayHouseEntries() {
-    const listContainer = document.getElementById('houseEntriesList');
-    if (!listContainer) return; // Sicherstellen, dass der Container da ist
-
-    listContainer.innerHTML = ''; // Liste leeren
-
-    if (currentHouseEntries.length === 0) {
-        listContainer.innerHTML = '<p>Noch keine Einträge für diese Straße vorhanden.</p>';
-        return;
-    }
-
-    currentHouseEntries.forEach(entry => {
-        const item = document.createElement('div');
-        item.className = 'house-entry-item'; // Klasse für Styling hinzufügen
-        item.style.padding = '10px';
-        item.style.borderBottom = '1px solid #333';
-        item.style.display = 'flex';
-        item.style.justifyContent = 'space-between';
-        item.style.alignItems = 'flex-start'; // Oben ausrichten
-
-        // Formatierung des Datums (wenn vorhanden)
-        const visitDate = entry.last_visit_date ? new Date(entry.last_visit_date).toLocaleDateString('de-DE') : 'N/A';
-        const notesPreview = entry.notes ? entry.notes.substring(0, 50) + (entry.notes.length > 50 ? '...' : '') : '';
-
-                item.innerHTML = `
-            <div style="flex-grow: 1; margin-right: 10px;">
-                <strong>Nr: ${entry.house_number || 'N/A'}</strong><br>
-                <small>Status: ${entry.status || 'Kein Status'}</small><br>
-                <small title="${entry.notes || ''}">Notiz: ${notesPreview || '-'}</small><br>
-                 <small>Letzter Besuch: ${visitDate}</small>
-            </div>
-            <div style="flex-shrink: 0;">
-                 <button onclick="editHouseEntry('${entry.id}')" class="buttonnumpad" style="font-size:0.8em; padding: 3px 6px; width:auto; height:auto; margin-right: 5px;">✏️</button>
-                 <button onclick="deleteHouseEntry('${entry.id}')" class="buttonnumpad" style="font-size:0.8em; padding: 3px 6px; width:auto; height:auto; background-color: var(--danger-color); ">❌</button>
-                    </div>
-                `;
-        listContainer.appendChild(item);
-    });
-}
-
-async function saveOrUpdateHouseEntry() {
-    const houseNumber = document.getElementById('houseNumberInput').value.trim();
-    const name = document.getElementById('nameInput').value.trim(); // Neuen Namen abrufen
-    const status = document.getElementById('statusSelect').value;
-    const notes = document.getElementById('notesInput').value.trim();
-
-    if (!houseNumber) {
-        showError("Bitte eine Hausnummer eingeben.");
-        return;
-    }
-    if (!currentSelectedStreetId) {
-        showError("Keine Straße ausgewählt.");
-        return;
-    }
-
-    clearError();
-    loadingIndicator.textContent = "Speichere Eintrag...";
-    loadingIndicator.style.display = 'block';
-
-    const entryData = {
-        street_id: currentSelectedStreetId,
-        user_id: currentUser.id,
-        house_number: houseNumber,
-        name: name || null, // Optionaler Name
-        status: status || null, // Leeren String als null speichern
-        notes: notes || null,
-        last_visit_date: new Date().toISOString() // Aktuelles Datum als letzter Besuch
-    };
-
-    try {
-        let result;
-        if (currentEditingEntryId) {
-            // Update
-            console.log(`Aktualisiere Eintrag ${currentEditingEntryId}`);
-            const { data, error } = await supabaseClient
-                .from('house_entries')
-                .update(entryData)
-                .eq('id', currentEditingEntryId)
-                .eq('user_id', currentUser.id); // Zusätzliche Sicherheit
-             if (error) throw error;
-             result = data;
-        } else {
-             // Prüfen ob Eintrag für Hausnummer schon existiert um Dupletten zu vermeiden
-             const { data: existing, error: checkError } = await supabaseClient
-                 .from('house_entries')
-                 .select('id')
-                 .eq('street_id', currentSelectedStreetId)
-                 .eq('house_number', houseNumber)
-                 .maybeSingle();
-
-             if (checkError) throw checkError;
-
-             if (existing) {
-                 // Eintrag existiert, stattdessen aktualisieren? Oder Fehler zeigen?
-                 // Hier: Aktualisieren statt neu anlegen
-                 console.log(`Eintrag für Hausnummer ${houseNumber} existiert, aktualisiere stattdessen.`);
-                  const { data, error } = await supabaseClient
-                      .from('house_entries')
-                      .update(entryData)
-                      .eq('id', existing.id)
-                      .eq('user_id', currentUser.id);
-                  if (error) throw error;
-                  result = data;
-                 // Alternative: Fehler zeigen
-                 // showError(`Eintrag für Hausnummer ${houseNumber} existiert bereits. Bearbeiten Sie den vorhandenen Eintrag.`);
-                 // loadingIndicator.style.display = 'none';
-                 // return;
-             } else {
-                 // Insert
-                 console.log(`Füge neuen Eintrag hinzu für Hausnummer ${houseNumber}`);
-                 const { data, error } = await supabaseClient
-                     .from('house_entries')
-                     .insert(entryData);
-                  if (error) throw error;
-                  result = data;
-             }
-        }
-
-        console.log("Eintrag erfolgreich gespeichert/aktualisiert.");
-        clearHouseEntryForm(); // Formular leeren
-        await loadHouseEntries(currentSelectedStreetId); // Liste neu laden
-        displayHouseEntries(); // Liste neu anzeigen
-
-    } catch (error) {
-        console.error("Fehler beim Speichern/Aktualisieren:", error);
-        showError(`Fehler beim Speichern: ${error.message}`);
-    } finally {
-        loadingIndicator.style.display = 'none';
-    }
-}
-
-// Füllt das Formular zum Bearbeiten eines Eintrags
-function editHouseEntry(entryId) {
-    const entry = currentHouseEntries.find(e => e.id === entryId);
-    if (!entry) return;
-
-    document.getElementById('houseNumberInput').value = entry.house_number || '';
-    document.getElementById('statusSelect').value = entry.status || '';
-    document.getElementById('notesInput').value = entry.notes || '';
-    currentEditingEntryId = entry.id; // Merken, welcher Eintrag bearbeitet wird
-
-    // Optional: Zum Formular scrollen
-    document.getElementById('houseEntryForm').scrollIntoView({ behavior: 'smooth' });
-}
-
-// Löscht einen Hausnummern-Eintrag
-async function deleteHouseEntry(entryId) {
-    if (!confirm("Möchten Sie diesen Eintrag wirklich löschen?")) return;
-
-    clearError();
-    loadingIndicator.textContent = "Lösche Eintrag...";
-    loadingIndicator.style.display = 'block';
-
-    try {
-            const { error } = await supabaseClient
-            .from('house_entries')
-            .delete()
-            .eq('id', entryId)
-            .eq('user_id', currentUser.id); // Sicherheit
-
-        if (error) throw error;
-
-        console.log(`Eintrag ${entryId} gelöscht.`);
-        await loadHouseEntries(currentSelectedStreetId); // Liste neu laden
-        displayHouseEntries(); // Liste neu anzeigen
-
-    } catch (error) {
-        console.error("Fehler beim Löschen:", error);
-        showError(`Fehler beim Löschen: ${error.message}`);
-    } finally {
-        loadingIndicator.style.display = 'none';
-    }
-}
-
-// Leert das Eingabeformular und den Bearbeitungsstatus
-function clearHouseEntryForm() {
-    const houseNumberInput = document.getElementById('houseNumberInput');
-    const statusSelect = document.getElementById('statusSelect');
-    const notesInput = document.getElementById('notesInput');
-
-    if(houseNumberInput) houseNumberInput.value = '';
-    if(statusSelect) statusSelect.value = '';
-    if(notesInput) notesInput.value = '';
-
-    currentEditingEntryId = null; // Bearbeitungsmodus beenden
-
-    // === ENTFERNT: Setzt den Fokus NICHT mehr automatisch ===
-    // if(houseNumberInput) houseNumberInput.focus();
-    // === ENDE ENTFERNT ===
-}
-
-
-function backToStreetList() {
-    streetDetailContainer.style.display = 'none';
-    streetDetailContainer.innerHTML = '';
-
-    // Filter ausblenden und Zustand zurücksetzen (bereits vorhanden)
-    // if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; // Wird jetzt unten gesteuert
-    currentAlphabetFilter = null;
-
-    // Platzhalter oder Liste wieder anzeigen
-    const hasStreetItems = streetListContainer.querySelector('.street-item');
-    if (!hasStreetItems && streetListPlaceholder) {
-        // Platzhalter anzeigen
-         streetListContainer.innerHTML = '';
-         streetListContainer.appendChild(streetListPlaceholder);
-         streetListPlaceholder.style.display = 'flex';
-         // Filter bleibt aus
-         if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
-    } else if (hasStreetItems) {
-        // Liste anzeigen
-        streetListContainer.querySelectorAll('.street-item').forEach(item => item.style.display = 'block');
-        // === NEU: Alphabet-Filter WIEDER anzeigen, wenn Liste angezeigt wird ===
-        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'flex';
-        // === ENDE NEU ===
-        // Aktiven Button im Alphabet-Filter zurücksetzen
-        document.querySelectorAll('.alphabet-button').forEach(btn => btn.classList.remove('active'));
-        const allBtn = alphabetFilterContainer?.querySelector('.alphabet-button');
-        if(allBtn) allBtn.classList.add('active');
-    }
-    // Container anzeigen
-    streetListContainer.style.display = 'flex';
-
-    currentSelectedStreetId = null;
-    currentHouseEntries = [];
-    currentEditingEntryId = null;
-    clearError();
-    plzInput.focus();
-}
-
-// --- NEU: View Switching Logik ---
-window.switchView = function(viewIdToShow, viewTitle) {
-    console.log(`[switchView] Start: Wechsle zu ${viewIdToShow} (${viewTitle})`);
-
-    // 1. Alle Views ausblenden (explizit über style.display)
-    views.forEach(view => {
-        if (view.style.display !== 'none' && view.id !== viewIdToShow) { // Nur loggen, wenn es tatsächlich ausgeblendet wird
-             console.log(`[switchView] Blende aus: ${view.id}`);
-        }
-        view.style.display = 'none'; // Explizit ausblenden
-        view.classList.remove('active-view'); // Auch Klasse entfernen
-    });
-
-    // 2. Die ausgewählte View anzeigen (explizit über style.display)
-    const viewToShow = document.getElementById(viewIdToShow);
-    if (viewToShow) {
-        console.log(`[switchView] Zeige an: ${viewToShow.id}`);
-        // Wähle den korrekten Display-Typ basierend auf der View
-        if (viewIdToShow === 'mainView') {
-            viewToShow.style.display = 'flex'; // mainView ist ein Flex-Container
-        } else {
-            viewToShow.style.display = 'block'; // Andere Views sind normale Block-Elemente
-        }
-        viewToShow.classList.add('active-view'); // Klasse hinzufügen
-    } else {
-        console.error(`[switchView] FEHLER: View mit ID "${viewIdToShow}" nicht gefunden!`);
-        return;
-    }
-
-    // 3. Aktiven Zustand der Navigationsleiste aktualisieren (unverändert)
-    navItems.forEach(item => {
-        const onclickAttr = item.getAttribute('onclick');
-        if (onclickAttr && onclickAttr.includes(`switchView('${viewIdToShow}'`)) {
-            item.classList.add('active');
-        } else {
-            item.classList.remove('active');
-        }
-    });
-
-    // 4. Titel in der Kopfzeile aktualisieren (unverändert)
-    if (currentViewTitleElement) {
-        currentViewTitleElement.textContent = viewTitle || 'Door Tracker';
-    }
-
-    // 5. Optional: Daten für die neue Ansicht laden (unverändert)
-    switch (viewIdToShow) {
-        case 'statsView':
-            console.log("[switchView] Lade Daten für Statistik");
-            loadStatsData(); // Statistikdaten laden
-            break;
-        case 'leaderboardView':
-             console.log("[switchView] Lade Daten für Leaderboard");
-             loadLeaderboardData(); // Leaderboard laden
-            break;
-        case 'settingsView':
-             console.log("[switchView] Lade Daten für Einstellungen");
-             loadSettingsData(); // Einstellungen laden
-            break;
-        case 'mainView':
-             console.log("[switchView] Aktiviere Hauptansicht");
-             if (streetDetailContainer.style.display !== 'none') { backToStreetList(); }
-            break;
-    }
-
-     // Scrollt die neue Ansicht nach oben (unverändert)
-     viewContainer.scrollTop = 0;
-     console.log(`[switchView] Ende: ${viewIdToShow} ist jetzt aktiv.`);
-}
-
-// --- Utility Funktionen ---
-function showError(message) {
-    errorDisplay.textContent = message;
-    errorDisplay.style.display = 'block';
-    // Optional: Nach einiger Zeit ausblenden
-    // setTimeout(clearError, 7000);
-}
-
-function clearError() {
-    errorDisplay.textContent = '';
-    errorDisplay.style.display = 'none';
-}
-
-// --- NEU: Event Listener für Input Fokus ---
-function setupInputFocusListeners() {
-    console.log("[setupInputFocusListeners] Adding listeners for nav hiding and Enter key.");
-
-    // === WIEDERHERGESTELLT: Listener für Nav-Ausblenden ===
-    const inputFieldsForNav = document.querySelectorAll(
-        'input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], textarea'
-    );
-
-    inputFieldsForNav.forEach(input => {
-        // Vorherige Listener entfernen (Sicherheit)
-        input.removeEventListener('focus', handleInputFocus);
-        input.removeEventListener('blur', handleInputBlur);
-        // Neue Listener hinzufügen
-        input.addEventListener('focus', handleInputFocus);
-        input.addEventListener('blur', handleInputBlur);
-    });
-    // === ENDE WIEDERHERGESTELLT ===
-
-    // Ruft jetzt die Funktion auf, die die Enter-Listener hinzufügt
-    setupAppEnterKeyListeners();
-}
-
-// === NEU: Handler für Focus/Blur ausgelagert ===
-function handleInputFocus() {
-    console.log('Input focus, hiding nav');
-    document.body.classList.add('nav-hidden');
-}
-
-function handleInputBlur() {
-    // Kleine Verzögerung, um Klicks auf die Nav zu ermöglichen
-    setTimeout(() => {
-         console.log('Input blur, showing nav');
-         document.body.classList.remove('nav-hidden');
-    }, 150); // Leicht erhöhte Verzögerung
-}
-// === ENDE NEU ===
-
-// Fügt Enter-Key Listener für Elemente *innerhalb* der App hinzu
-function setupAppEnterKeyListeners() {
-     console.log("[setupAppEnterKeyListeners] Adding Enter key listeners.");
-     // -- PLZ Suche --
-     if (plzInput && !plzInput.hasEnterListener) {
-         console.log(" -> Adding PLZ Enter listener.");
-         plzInput.addEventListener('keydown', handlePlzEnter);
-         plzInput.hasEnterListener = true;
-     }
-     // -- Einstellungen (Anzeigename) --
-      if (displayNameInput && !displayNameInput.hasEnterListener) {
-          console.log(" -> Adding Settings Enter listener.");
-         displayNameInput.addEventListener('keydown', handleSettingsEnter);
-         displayNameInput.hasEnterListener = true;
-      }
-}
-
-// Handler-Funktionen für Enter (unverändert)
-function handlePlzEnter(event) {
-    if (event.key === 'Enter') {
-        console.log("Enter detected in PLZ Input"); // DEBUG
-        event.preventDefault();
-        searchStreets(); // Straßen suchen
-    }
-}
-
-function handleSettingsEnter(event) {
-     if (event.key === 'Enter') {
-         console.log("Enter detected in Display Name Input"); // DEBUG
-         event.preventDefault();
-         saveSettings(); // Einstellungen speichern
-     }
-}
-
-// === NEUE FUNKTIONEN FÜR ALPHABET FILTER ===
-
-// Rendert die Alphabet-Buttons
-function renderAlphabetFilter() {
-    if (!alphabetFilterContainer) return;
-    alphabetFilterContainer.innerHTML = ''; // Leeren
-
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
-    // Button für "Alle" hinzufügen
-    const allButton = createAlphabetButton('Alle');
-    allButton.classList.add('active'); // Standardmäßig aktiv
-    alphabetFilterContainer.appendChild(allButton);
-
-    // Buchstaben A-Z
-    alphabet.forEach(letter => {
-        alphabetFilterContainer.appendChild(createAlphabetButton(letter));
-    });
-
-    // Optional: Button für Zahlen/Sonderzeichen
-    // const otherButton = createAlphabetButton('#');
-    // alphabetFilterContainer.appendChild(otherButton);
-}
-
-// Erstellt einen einzelnen Alphabet-Button
-function createAlphabetButton(letter) {
-    const button = document.createElement('button');
-    button.textContent = letter;
-    button.className = 'alphabet-button';
-    button.type = 'button'; // Wichtig, um Formularabsendung zu verhindern
-    button.onclick = () => {
-        filterStreetsByLetter(letter);
-        // Aktiven Zustand setzen
-        document.querySelectorAll('.alphabet-button').forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
-    };
-    return button;
-}
-
-// Filtert die Liste nach Anfangsbuchstaben
-function filterStreetsByLetter(letter) {
-    console.log(`[filterStreetsByLetter] Filtering by: ${letter}`);
-    if (!streetListContainer) return;
-    currentAlphabetFilter = letter; // Aktuellen Filter speichern
-
-    const streetItems = streetListContainer.querySelectorAll('.street-item');
-    streetItems.forEach(item => {
-        const streetName = item.textContent.trim();
-        let show = false;
-
-        if (letter === 'Alle') {
-            show = true;
-        } else if (letter === '#') {
-            // Zeige Elemente, die nicht mit A-Z beginnen (optional)
-            show = !/^[a-z]/i.test(streetName);
-        } else {
-            // Zeige Elemente, die mit dem Buchstaben beginnen (Groß/Kleinschreibung ignorieren)
-            show = streetName.toLowerCase().startsWith(letter.toLowerCase());
-        }
-
-        item.style.display = show ? 'block' : 'none';
-    });
-
-    // "Kein Treffer"-Nachricht entfernen, da dies keine leere Liste bedeutet
-    const noFilterResultsMsg = streetListContainer.querySelector('.no-filter-results');
-    if (noFilterResultsMsg) noFilterResultsMsg.remove();
-     // Platzhalter auch entfernen, falls er noch da ist
-     if (streetListPlaceholder && streetListPlaceholder.parentNode === streetListContainer) {
-         streetListPlaceholder.style.display = 'none';
-     }
-}
-
-// === ENDE NEUE FUNKTIONEN ===
-
-// --- Ladefunktionen für die Views ---
-
-async function loadStatsData() {
-    if (!currentUser) return;
-
-    statsContent.style.display = 'none';
-    statsErrorDisplay.style.display = 'none';
-    statsLoadingIndicator.style.display = 'block';
-
-    try {
-        const { data: entries, error } = await supabaseClient
-            .from('house_entries')
-            .select('status') // Nur den Status abrufen
-            .eq('user_id', currentUser.id);
-
-        if (error) throw error;
-
-        // Statistiken berechnen
-        const totalEntries = entries.length;
-        const statusCounts = {
-            'Abgeschlossen': 0,
-            'Interessiert': 0,
-            'Kein Interesse': 0,
-            'Erneut besuchen': 0,
-            'Nicht angetroffen': 0,
-            'Andere': 0, // Auch 'Andere' zählen
-            'null': 0 // Einträge ohne Status zählen
+                alert('Registrierung erfolgreich! Bitte E-Mail-Adresse bestätigen.');
         };
 
-        entries.forEach(entry => {
-            const status = entry.status || 'null'; // Fallback für null/leeren Status
-            if (statusCounts.hasOwnProperty(status)) {
-                statusCounts[status]++;
-            } else {
-                 statusCounts['Andere']++; // Unbekannte Stati zu 'Andere'
+        // Logout Funktion
+        window.logout = async function() {
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) {
+                alert('Fehler beim Logout: ' + error.message);
+                return;
+            }
+        };
+
+        // Load Data Funktion
+        async function loadData() {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            
+            const { data, error } = await supabaseClient
+                .from('entries')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .eq('month', currentMonth);
+
+            if (error) {
+                alert('Fehler beim Laden der Daten: ' + error.message);
+                return;
+            }
+
+            updateCurrentMonthData(data);
+            await loadHistory();
+        }
+
+        // Update Current Month Data Funktion
+        async function updateCurrentMonthData(entries) {
+        const decimalPlaces = 2; // Anzahl der gewünschten Nachkommastellen
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        
+        // Alle vorherigen Monate laden
+        const { data: historicalData } = await supabaseClient
+            .from('entries')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .lt('month', currentMonth);
+    
+        // Fehlende Spenden aus der Vergangenheit berechnen
+        const missingDonations = historicalData.reduce((acc, entry) => {
+            if (!acc[entry.month]) {
+                acc[entry.month] = { income: 0, donations: 0 };
+            }
+            if (entry.type === 'income') {
+                acc[entry.month].income = (acc[entry.month].income || 0) + entry.amount;
+            } else if (entry.type === 'donation') {
+                acc[entry.month].donations = (acc[entry.month].donations || 0) + entry.amount;
+            }
+            return acc;
+        }, {});
+    
+        let totalMissingDonations = 0;
+        Object.values(missingDonations).forEach(month => {
+            const required = parseFloat((month.income * 0.1).toFixed(decimalPlaces));
+            if (month.donations < required) {
+                totalMissingDonations += parseFloat((required - month.donations).toFixed(decimalPlaces));
             }
         });
-
-        displayStatsData(totalEntries, statusCounts);
-        renderStatusChart(statusCounts); // Chart rendern
-
-        statsContent.style.display = 'block';
-
-    } catch (error) {
-        console.error("Fehler beim Laden der Statistiken:", error);
-        statsErrorDisplay.textContent = `Fehler beim Laden der Statistiken: ${error.message}`;
-        statsErrorDisplay.style.display = 'block';
-    } finally {
-        statsLoadingIndicator.style.display = 'none';
-    }
-}
-
-async function loadLeaderboardData() {
-    if (!currentUser) return;
-
-    leaderboardContent.style.display = 'none';
-    leaderboardErrorDisplay.style.display = 'none';
-    leaderboardLoadingIndicator.style.display = 'block';
-
-    try {
-        // === GEÄNDERT: Aufruf der SQL RPC Funktion statt Edge Function ===
-        console.log("Rufe RPC Funktion 'get_leaderboard_data' auf...");
-        const { data: leaderboardEntries, error: rpcError } = await supabaseClient
-            .rpc('get_leaderboard_data'); // Der Name der SQL-Funktion
-
-        if (rpcError) {
-            console.error("Fehler beim RPC-Aufruf 'get_leaderboard_data':", rpcError);
-            throw new Error(`Fehler beim Abrufen des Leaderboards: ${rpcError.message}`);
+                
+        currentMonthData.income = parseFloat(
+            entries
+                .filter(entry => entry.type === 'income')
+                .reduce((sum, entry) => sum + entry.amount, 0)
+                .toFixed(decimalPlaces)
+        );
+    
+        const totalRequiredDonation = parseFloat(
+            (currentMonthData.income * 0.1).toFixed(decimalPlaces)
+        );
+    
+        const totalActualDonation = parseFloat(
+            entries
+                .filter(entry => entry.type === 'donation')
+                .reduce((sum, entry) => sum + entry.amount, 0)
+                .toFixed(decimalPlaces)
+        );
+    
+        // requiredDonation berücksichtigt jetzt die bisherigen Spenden
+        currentMonthData.requiredDonation = parseFloat(
+            Math.max(totalRequiredDonation - totalActualDonation + totalMissingDonations).toFixed(decimalPlaces)
+        );
+    
+        currentMonthData.actualDonation = totalActualDonation;
+    
+        updateUI();
         }
+            
 
-        // Die Daten sollten bereits im korrekten Format sein
-        if (!leaderboardEntries || !Array.isArray(leaderboardEntries)) {
-             console.error("Ungültige Daten von RPC erhalten:", leaderboardEntries);
-            throw new Error("Ungültige Daten vom Leaderboard-Endpunkt erhalten.");
-        }
-        // === ENDE ÄNDERUNG ===
+        // Load History Funktion
+        async function loadHistory() {
+            const { data, error } = await supabaseClient
+                .from('entries')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('month', { ascending: false });
 
-        displayLeaderboardData(leaderboardEntries); // Verwende die Daten direkt
-        leaderboardContent.style.display = 'block';
+            if (error) {
+                alert('Fehler beim Laden der Historie: ' + error.message);
+                return;
+            }
 
-    } catch (error) {
-        console.error("Fehler beim Laden des Leaderboards:", error);
-        leaderboardErrorDisplay.textContent = `${error.message}`; // Zeige die spezifische Fehlermeldung
-        leaderboardErrorDisplay.style.display = 'block';
-    } finally {
-        leaderboardLoadingIndicator.style.display = 'none';
-    }
-}
-
-async function loadSettingsData() {
-    if (!currentUser) return;
-
-    settingsContent.style.display = 'none';
-    settingsErrorDisplay.style.display = 'none';
-    settingsLoadingIndicator.style.display = 'block';
-    settingsStatus.textContent = ''; // Status zurücksetzen
-    settingsStatus.className = '';
-
-    try {
-        // Hole aktuelle Benutzerdaten, inklusive Metadaten
-        // Wichtig: getSession liefert nicht immer die aktuellsten Metadaten, getUser ist besser
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-
-         if (userError) throw userError;
-         if (!user) throw new Error("Benutzerdaten konnten nicht geladen werden.");
-
-
-        // Setze den aktuellen Anzeigenamen ins Feld
-        const currentDisplayName = user.user_metadata?.display_name || '';
-        displayNameInput.value = currentDisplayName;
-
-        settingsContent.style.display = 'block';
-
-    } catch (error) {
-        console.error("Fehler beim Laden der Einstellungen:", error);
-        settingsErrorDisplay.textContent = `Fehler beim Laden der Einstellungen: ${error.message}`;
-        settingsErrorDisplay.style.display = 'block';
-    } finally {
-        settingsLoadingIndicator.style.display = 'none';
-    }
-}
-
-
-// --- Anzeige-/Renderfunktionen ---
-
-function displayStatsData(total, counts) {
-    statTotalEntries.textContent = total;
-    statCompletedEntries.textContent = counts['Abgeschlossen'] || 0;
-    statInterestedEntries.textContent = counts['Interessiert'] || 0;
-    statNotInterestedEntries.textContent = counts['Kein Interesse'] || 0;
-    statRevisitEntries.textContent = counts['Erneut besuchen'] || 0;
-    statNotMetEntries.textContent = counts['Nicht angetroffen'] || 0;
-    // Optional: Zeige 'Andere' oder 'Ohne Status' an, wenn gewünscht
-}
-
-function renderStatusChart(statusCounts) {
-    if (!statusChartCanvas) return;
-    const ctx = statusChartCanvas.getContext('2d');
-
-    // Zerstöre alte Instanz, falls vorhanden
-    if (statsChartInstance) {
-        statsChartInstance.destroy();
-    }
-
-    // Bereite Daten für Chart.js vor
-    const labels = Object.keys(statusCounts).filter(status => status !== 'null' && statusCounts[status] > 0); // 'null' ignorieren, nur Stati mit >0 Einträgen
-    const dataValues = labels.map(label => statusCounts[label]);
-
-    // Farben für die Segmente (Beispiel, anpassen!)
-    const backgroundColors = [
-        '#16a34a', // Abgeschlossen (Grün)
-        '#2563eb', // Interessiert (Blau)
-        '#dc2626', // Kein Interesse (Rot)
-        '#f59e0b', // Erneut besuchen (Gelb/Orange)
-        '#6b7280', // Nicht angetroffen (Grau)
-        '#0284c7'  // Andere (Helles Blau)
-    ];
-     // Sicherstellen, dass wir genug Farben haben (ggf. wiederholen)
-     const chartColors = dataValues.map((_, index) => backgroundColors[index % backgroundColors.length]);
-
-    // Definiere die Hintergrundfarbe aus den CSS Variablen (oder hardcode sie)
-    // const cardBgColor = getComputedStyle(document.documentElement).getPropertyValue('--card-bg').trim() || '#f8fafc'; // Dynamisch holen
-    const cardBgColor = '#f8fafc'; // Statischer Wert (einfacher)
-
-    statsChartInstance = new Chart(ctx, {
-        type: 'pie', // oder 'doughnut' oder 'bar'
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Status Verteilung',
-                data: dataValues,
-                backgroundColor: chartColors,
-                // === FIX 1: Verwende den JS-Wert oder einen statischen Wert ===
-                borderColor: cardBgColor, // Hintergrundfarbe für Ränder
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true, // Passt Höhe/Breite an
-             plugins: {
-                 legend: {
-                     position: 'bottom', // Legende unten
-                     labels: {
-                          padding: 15 // Mehr Abstand für Legende
-                     }
-                 }, // === FIX 2: Komma nach dem legend-Objekt hinzugefügt ===
-                 tooltip: {
-                     callbacks: {
-                         // === FIX 3: Funktion in Kurzform oder sicherstellen, dass Syntax korrekt ist (war eigentlich ok) ===
-                         label: function(context) {
-                             let label = context.label || '';
-                             if (label) {
-                                 label += ': ';
-                             }
-                             if (context.parsed !== null) {
-                                 label += context.parsed;
-                             }
-                             // Optional: Prozent anzeigen
-                             // const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                             // const percentage = ((context.parsed / total) * 100).toFixed(1) + '%';
-                             // label += ` (${percentage})`;
-                             return label;
-                         } // Ende label callback
-                     } // Ende callbacks
-                 } // Ende tooltip
-             } // Ende plugins
-        } // Ende options
-    }); // Ende new Chart
-}
-
-
-function displayLeaderboardData(leaderboard) {
-    if (!leaderboardTableBody) return;
-    leaderboardTableBody.innerHTML = ''; // Tabelle leeren
-
-    if (leaderboard.length === 0) {
-        leaderboardTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Noch keine Daten für das Leaderboard vorhanden.</td></tr>';
-        return;
-    }
-
-    leaderboard.forEach((userEntry, index) => {
-        const rank = index + 1;
-        const row = document.createElement('tr');
-
-        // Hebe den aktuellen Benutzer hervor
-        if (currentUser && userEntry.id === currentUser.id) {
-            row.classList.add('current-user-row');
-        }
-
-        row.innerHTML = `
-            <td>${rank}</td>
-            <td>${escapeHtml(userEntry.display_name || 'Unbekannt')}</td>
-            <td>${userEntry.completed_count || 0}</td>
-        `;
-        leaderboardTableBody.appendChild(row);
-    });
-}
-
-// Kleine Hilfsfunktion zum Escapen von HTML, um XSS zu verhindern
-function escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    return unsafe
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;")
-         .replace(/"/g, "&quot;")
-         .replace(/'/g, "&#039;");
- }
-
-// --- Speicherfunktion für Einstellungen ---
-
-window.saveSettings = async function() {
-    if (!currentUser) return;
-
-    const newName = displayNameInput.value.trim();
-    if (newName.length < 3 || newName.length > 30) {
-        showSettingsMessage("Anzeigename muss zwischen 3 und 30 Zeichen lang sein.", true);
-        return;
-    }
-
-    saveSettingsButton.disabled = true;
-    saveSettingsButton.textContent = "Speichert...";
-    showSettingsMessage(''); // Alte Meldung löschen
-
-    try {
-        const { data, error } = await supabaseClient.auth.updateUser({
-            data: { display_name: newName } // Speichert im user_metadata -> data Feld
-        });
-
-        if (error) throw error;
-
-        showSettingsMessage("Anzeigename erfolgreich gespeichert!", false);
-        console.log("Benutzerdaten aktualisiert:", data);
-        // Optional: Leaderboard neu laden, wenn es gerade angezeigt wird?
-        // if(document.getElementById('leaderboardView').classList.contains('active-view')) {
-        //     loadLeaderboardData();
-        // }
-
-    } catch (error) {
-        console.error("Fehler beim Speichern der Einstellungen:", error);
-        showSettingsMessage(`Fehler: ${error.message}`, true);
-    } finally {
-        saveSettingsButton.disabled = false;
-        saveSettingsButton.textContent = "Namen speichern";
-    }
-};
-
-function showSettingsMessage(message, isError = false) {
-    settingsStatus.textContent = message;
-    settingsStatus.className = isError ? 'error' : 'success';
-}
-
-// --- Initialisierung ---
-document.addEventListener('DOMContentLoaded', () => {
-    // === WICHTIG: Login Listener schon hier hinzufügen, da Login-Screen zuerst da ist ===
-    setupLoginEnterListeners();
-    // === ENDE ÄNDERUNG ===
-    checkSession();
-});
-
-// === NEU: Separate Funktion für Login Listener ===
-function setupLoginEnterListeners() {
-    console.log("[setupLoginEnterListeners] Adding Enter key listeners for Login/Register."); // DEBUG
-    if (loginPasswordInput) {
-        loginPasswordInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                const registerBtnVisible = registerButton && !registerButton.classList.contains('hidden');
-                if (registerBtnVisible) {
-                    console.log("Enter in Password (Register)");
-                    register();
-                } else {
-                    console.log("Enter in Password (Login)");
-                    login();
+            const monthlyData = data.reduce((acc, entry) => {
+                if (!acc[entry.month]) {
+                    acc[entry.month] = { income: 0, donations: 0 };
                 }
+                if (entry.type === 'income') {
+                    acc[entry.month].income += entry.amount;
+                } else {
+                    acc[entry.month].donations += entry.amount;
+                }
+                return acc;
+            }, {});
+
+            updateHistoryUI(monthlyData);
+        }
+
+        // Update History UI Funktion
+        function updateHistoryUI(monthlyData) {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '';
+
+            Object.entries(monthlyData).forEach(([month, data]) => {
+                const requiredDonation = data.income * 0.1;
+                const className = data.donations >= requiredDonation ? 'success' : 'danger';
+                
+                const item = document.createElement('div');
+                item.className = `history-item ${className}`;
+                item.innerHTML = `
+                    <div>${month}</div>
+                    <div>
+                    💶${data.income} € | ⛪${data.donations} €
+                    <span class="edit-icon" onclick="showEditModal('${month}')">✏️</span>
+                    </div>
+                `;
+                historyList.appendChild(item);
+            });
+        }
+
+        async function showEditModal(month) {
+            const { data, error } = await supabaseClient
+                .from('entries')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .eq('month', month);
+        
+            if (error) {
+                alert('Fehler beim Laden der Einträge: ' + error.message);
+                return;
+            }
+        
+            const entriesList = document.getElementById('entriesList');
+            entriesList.innerHTML = '';
+            
+            data.forEach(entry => {
+                const div = document.createElement('div');
+                div.className = 'entry-item';
+                div.innerHTML = `
+                    <span>${entry.type === 'income' ? 'Einnahme' : 'Spende'}: ${entry.amount} €</span>
+                    <div>
+                        <span onclick="editEntry('${entry.id}', ${entry.amount})">✏️ Ändern</span>
+                        <span onclick="deleteEntry('${entry.id}')">❌</span>
+                    </div>
+                `;
+                entriesList.appendChild(div);
+            });
+        
+            document.getElementById('editModal').style.display = 'flex';
+        }
+        
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+        
+        async function deleteEntry(id) {
+            if (!confirm('Möchtest du diesen Eintrag wirklich löschen?')) return;
+        
+            const { error } = await supabaseClient
+                .from('entries')
+                .delete()
+                .match({ id });
+        
+            if (error) {
+                alert('Fehler beim Löschen: ' + error.message);
+                return;
+            }
+        
+            loadData();
+            closeEditModal();
+        }
+        
+        async function editEntry(id, currentAmount) {
+            const newAmount = prompt('Neuer Betrag:', currentAmount);
+            if (!newAmount) return;
+        
+            const { error } = await supabaseClient
+                .from('entries')
+                .update({ amount: parseFloat(newAmount) })
+                .match({ id });
+        
+            if (error) {
+                alert('Fehler beim Aktualisieren: ' + error.message);
+                return;
+            }
+        
+            loadData();
+            closeEditModal();
+        }
+        
+        // Update UI Funktion
+        function updateUI() {
+            document.querySelector('.current-amount').textContent = `${currentMonthData.income} €`;
+            document.querySelector('.required-donation').textContent = `${currentMonthData.requiredDonation} €`;
+            document.querySelector('.actual-donation').textContent = `${currentMonthData.actualDonation} €`;
+            
+            
+            const requiredElement = document.querySelector('.required-donation');
+            if (currentMonthData.requiredDonation <= 0) {
+                requiredElement.style.color = 'var(--success-color)';
+            } else {
+                requiredElement.style.color = 'var(--danger-color)';
+            }
+        }
+
+        function showModal() {
+            document.getElementById('entryDate').valueAsDate = new Date();
+            document.getElementById('entryModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('entryModal').style.display = 'none';
+        }
+
+        async function saveEntry() {
+            const amount = parseFloat(document.getElementById('amount').value);
+            const type = document.querySelector('input[name="entryType"]:checked').value;
+            const date = document.getElementById('entryDate').value;
+            const [year, month] = date.split('-');
+            const entryMonth = `${year}-${month}`;
+
+            const { error } = await supabaseClient
+                .from('entries')
+                .insert([
+                    {
+                        user_id: currentUser.id,
+                        type,
+                        amount,
+                        month: entryMonth
+                    }
+                ]);
+
+            if (error) {
+                alert('Fehler beim Speichern: ' + error.message);
+                return;
+            }
+            
+            if (type == 'donation') {
+                audioApplePay.currentTime = 0; // Reset time to play from the start
+                audioApplePay.play(); // Play the sound
+            } else {
+                audioApplePay.currentTime = 0; // Reset time to play from the start
+                audioApplePay.play(); // Play the sound
+            }
+            
+            closeModal();
+            loadData();
+        }
+
+        // Event-Listener für ESC-Taste zum Schließen des Modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
             }
         });
-    }
-     if (loginEmailInput) {
-          loginEmailInput.addEventListener('keydown', (event) => {
-              if (event.key === 'Enter') {
-                   event.preventDefault();
-                   if(loginPasswordInput) loginPasswordInput.focus(); // Fokus auf Passwortfeld setzen
-               }
-          });
-     }
-}
-// === ENDE NEU ===
+
+        
+        function registerNow() {
+            document.getElementById('register').classList.remove('hidden');
+            document.getElementById('login').classList.add('hidden');
+            document.getElementById('registerText').style.display = 'none';
+            const item2 = document.createElement('div');
+            item2.innerHTML = `
+            <div>
+            <a href="/" style="text-decoration: none; color: white;">Du hast bereits ein Konto? <u>Anmelden</u></a>
+            </div>
+            `;
+            document.getElementById('loginContainer').appendChild(item2);
+        }
+        
+
+        // Initial session check
+        checkSession();
