@@ -19,7 +19,7 @@ self.addEventListener("install", (event) => {
 var GHPATH = '';
  
 // Choose a different app prefix name
-var APP_PREFIX = 'tt';
+var APP_PREFIX = 'dt';
  
 // The version of the cache. Every time you change any of the files
 // you need to change this version (version_01, version_02…). 

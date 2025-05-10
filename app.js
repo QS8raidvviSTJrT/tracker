@@ -1,11 +1,5 @@
-const supabaseUrl = window.NETLIFY_API_LINK;
-const supabaseKey = window.NETLIFY_API_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-    console.error("Supabase URL oder Key nicht gefunden! Überprüfe die Netlify Umgebungsvariablen und Snippet Injection.");
-    // Optional: Dem Nutzer eine Fehlermeldung anzeigen
-    alert("Fehler bei der Konfiguration. Die Anwendung kann nicht geladen werden.");
-}
+const supabaseUrl = 'https://pvjjtwuaofclmsvsaneo.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2amp0d3Vhb2ZjbG1zdnNhbmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4NzM2OTksImV4cCI6MjA2MjQ0OTY5OX0.yc4F3gKDGKMmws60u3KOYSM8t06rvDiJgOvEAuiYRa8'
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
         let deferredPrompt;
@@ -42,6 +36,8 @@ const statInterestedEntries = document.getElementById('statInterestedEntries');
 const statNotInterestedEntries = document.getElementById('statNotInterestedEntries');
 const statRevisitEntries = document.getElementById('statRevisitEntries');
 const statNotMetEntries = document.getElementById('statNotMetEntries');
+const statGeschriebenEntries = document.getElementById('statGeschriebenEntries');
+const statNichtGeoeffnetEntries = document.getElementById('statNichtGeoeffnetEntries');
 const statusChartCanvas = document.getElementById('statusChart');
 
 const leaderboardLoadingIndicator = document.getElementById('leaderboardLoadingIndicator');
@@ -140,7 +136,6 @@ function showLogin() {
     appContainer.style.display = 'none';
     // Reset App State
     resetAppState();
-    setupLoginEnterListeners();
 }
 
 function showApp() {
@@ -449,38 +444,37 @@ async function selectStreet(streetName, postalCode) {
     // === ENDE NEU ===
 
     try {
-        // 1. Prüfen, ob Straße für User existiert, sonst anlegen
+        // 1. Prüfen, ob Straße global existiert (ohne user_id Filter)
         let { data: existingStreet, error: fetchError } = await supabaseClient
             .from('streets')
             .select('id')
-            .eq('user_id', currentUser.id)
+            // .eq('user_id', currentUser.id) // ENTFERNT: Straßen sind global
             .eq('name', streetName)
-            .eq('postal_code', postalCode) // Prüfe auch PLZ
-            .maybeSingle(); // Gibt null zurück, wenn nicht gefunden, statt Fehler
+            .eq('postal_code', postalCode)
+            .maybeSingle();
 
         if (fetchError) throw fetchError;
 
         if (existingStreet) {
             currentSelectedStreetId = existingStreet.id;
         } else {
-            // Straße neu anlegen
+            // Straße neu global anlegen (ohne user_id)
             const { data: newStreet, error: insertError } = await supabaseClient
                 .from('streets')
                 .insert({
-                    user_id: currentUser.id,
+                    // user_id: currentUser.id, // ENTFERNT: Straßen haben keinen direkten User-Besitzer mehr
                     name: streetName,
                     postal_code: postalCode
-                    // city könnte man auch noch versuchen via Nominatim zu holen
                 })
                 .select('id')
-                .single(); // Erwarten genau ein Ergebnis
+                .single();
 
             if (insertError) throw insertError;
             currentSelectedStreetId = newStreet.id;
-            console.log(`Straße "${streetName}" (${postalCode}) mit ID ${currentSelectedStreetId} neu angelegt.`);
+            console.log(`Straße "${streetName}" (${postalCode}) mit ID ${currentSelectedStreetId} global neu angelegt.`);
         }
 
-        // 2. Lade Hausnummern-Einträge für diese Straße
+        // 2. Lade Hausnummern-Einträge für diese globale Straße
         await loadHouseEntries(currentSelectedStreetId);
 
         // 3. Zeige Detailansicht mit Hausnummern-Interface
@@ -489,7 +483,7 @@ async function selectStreet(streetName, postalCode) {
     } catch (error) {
         console.error('Fehler beim Auswählen/Anlegen der Straße oder Laden der Einträge:', error);
         showError(`Ein Fehler ist aufgetreten: ${error.message}`);
-        backToStreetList(); // Im Fehlerfall zurück zur Liste (zeigt Filter ggf. wieder an)
+        backToStreetList(); // Im Fehlerfall zurück zur Liste
     } finally {
         loadingIndicator.style.display = 'none';
     }
@@ -538,20 +532,24 @@ function renderStreetDetailView(streetName) {
     formDiv.style.padding = '15px';
     formDiv.style.backgroundColor = 'var(--background-color)'; // Etwas abheben
     formDiv.style.borderRadius = '10px';
+
+    // Gemeinsame Stile für Eingabefelder für bessere Wartbarkeit
+    const inputStyle = `padding: 10px; border: 1px solid var(--border-color, #ccc); border-radius: 5px; background-color: var(--input-bg, white); color: var(--text-color, black); box-sizing: border-box;`;
+
     formDiv.innerHTML = `
         <h5>Neuer Eintrag / Bearbeiten</h5>
-        <input type="text" id="houseNumberInput" placeholder="Hausnummer" required>
-        <input type="text" id="nameInput" placeholder="Name (optional)"> <!-- Neues Eingabefeld für den Namen -->
-        <select id="statusSelect">
+        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+            <input type="text" id="houseNumberInput" placeholder="Hausnummer" required style="flex-grow: 1; ${inputStyle}">
+            <input type="text" id="nameInput" placeholder="Name" style="flex-grow: 1; ${inputStyle}">
+        </div>
+        <select id="statusSelect" style="width: 100%; margin-bottom: 12px; ${inputStyle}">
             <option value="">-- Status --</option>
-            <option value="Nicht angetroffen">Nicht angetroffen</option>
-            <option value="Interessiert">Interessiert</option>
+            <option value="Geschrieben">Geschrieben</option>
             <option value="Kein Interesse">Kein Interesse</option>
-            <option value="Erneut besuchen">Erneut besuchen</option>
-            <option value="Abgeschlossen">Abgeschlossen</option>
+            <option value="Nicht geöffnet">Nicht geöffnet</option>
             <option value="Andere">Andere</option>
         </select>
-        <textarea id="notesInput" placeholder="Notizen..."></textarea>
+        <textarea id="notesInput" placeholder="Notizen..." style="width: 100%; min-height: 80px; margin-bottom: 15px; ${inputStyle}"></textarea>
         <div class="form-button-group">
             <button onclick="saveOrUpdateHouseEntry()">Speichern</button>
             <button onclick="clearHouseEntryForm()">Abbrechen/Neu</button>
@@ -562,7 +560,7 @@ function renderStreetDetailView(streetName) {
     // === NEU: Enter-Listener für Formularfelder hinzufügen ===
     const houseNumberInput = formDiv.querySelector('#houseNumberInput');
     const notesInput = formDiv.querySelector('#notesInput');
-    // Optional: const statusSelect = formDiv.querySelector('#statusSelect');
+    const statusSelect = formDiv.querySelector('#statusSelect');
 
     const formEnterHandler = (event) => {
          if (event.key === 'Enter') {
@@ -578,8 +576,7 @@ function renderStreetDetailView(streetName) {
 
     if(houseNumberInput) houseNumberInput.addEventListener('keydown', formEnterHandler);
     if(notesInput) notesInput.addEventListener('keydown', formEnterHandler);
-    // Optional: Listener für Select (weniger üblich, Enter löst normalerweise Auswahl aus)
-    // if(statusSelect) statusSelect.addEventListener('keydown', formEnterHandler);
+    if(statusSelect) statusSelect.addEventListener('keydown', formEnterHandler);
     // === ENDE NEU ===
 
     // Liste für vorhandene Einträge
@@ -599,43 +596,66 @@ function displayHouseEntries() {
 
     listContainer.innerHTML = ''; // Liste leeren
 
+    // Grid-Layout für die Liste
+    listContainer.style.display = 'grid';
+    listContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))'; // Zwei Spalten, responsive
+    listContainer.style.gap = '15px'; // Abstand zwischen den Elementen
+
     if (currentHouseEntries.length === 0) {
-        listContainer.innerHTML = '<p>Noch keine Einträge für diese Straße vorhanden.</p>';
+        listContainer.style.display = 'block'; // Zurück zum Block-Layout für die Nachricht
+        listContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Noch keine Einträge für diese Straße vorhanden.</p>';
         return;
     }
 
     currentHouseEntries.forEach(entry => {
         const item = document.createElement('div');
-        item.className = 'house-entry-item'; // Klasse für Styling hinzufügen
-        item.style.padding = '10px';
-        item.style.borderBottom = '1px solid #333';
-        item.style.display = 'flex';
-        item.style.justifyContent = 'space-between';
-        item.style.alignItems = 'flex-start'; // Oben ausrichten
+        item.className = 'house-entry-item card'; // Klasse für Styling hinzufügen + 'card' für konsistenten Look
+        // item.style.padding = '15px'; // Wird durch card-Style ggf. übernommen
+        // item.style.border = '1px solid var(--border-color)'; // Konsistenter Rand
+        // item.style.borderRadius = '8px'; // Abgerundete Ecken
+        // item.style.backgroundColor = 'var(--card-bg)'; // Hintergrund
+        // item.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'; // Leichter Schatten
 
-        // Formatierung des Datums (wenn vorhanden)
-        const visitDate = entry.last_visit_date ? new Date(entry.last_visit_date).toLocaleDateString('de-DE') : 'N/A';
-        const notesPreview = entry.notes ? entry.notes.substring(0, 50) + (entry.notes.length > 50 ? '...' : '') : '';
+        const visitDate = entry.last_visit_date ? new Date(entry.last_visit_date).toLocaleDateString('de-DE') : 'Unbekannt';
+        const notesPreview = entry.notes ? entry.notes.substring(0, 70) + (entry.notes.length > 70 ? '...' : '') : '-';
+        
+        // Status farblich hervorheben (optional, Beispiel)
+        let statusColor = 'var(--text-color-muted)'; // Standardfarbe
+        switch(entry.status) {
+            case 'Geschrieben': statusColor = 'var(--success-color)'; break;
+            case 'Kein Interesse': statusColor = 'var(--danger-color)'; break;
+            case 'Nicht geöffnet': statusColor = 'var(--warning-color)'; break;
+            // 'Andere' behält Standard oder eine spezifische Farbe
+        }
 
-                item.innerHTML = `
-            <div style="flex-grow: 1; margin-right: 10px;">
-                <strong>Nr: ${entry.house_number || 'N/A'}</strong><br>
-                <small>Status: ${entry.status || 'Kein Status'}</small><br>
-                <small title="${entry.notes || ''}">Notiz: ${notesPreview || '-'}</small><br>
-                 <small>Letzter Besuch: ${visitDate}</small>
+
+        item.innerHTML = `
+            <div class="card-header" style="padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color);">
+                <strong style="font-size: 1.1em;">Hausnr: ${entry.house_number || 'N/A'}</strong>
             </div>
-            <div style="flex-shrink: 0;">
-                 <button onclick="editHouseEntry('${entry.id}')" class="buttonnumpad" style="font-size:0.8em; padding: 3px 6px; width:auto; height:auto; margin-right: 5px;">✏️</button>
-                 <button onclick="deleteHouseEntry('${entry.id}')" class="buttonnumpad" style="font-size:0.8em; padding: 3px 6px; width:auto; height:auto; background-color: var(--danger-color); ">❌</button>
-                    </div>
-                `;
+            <div class="card-content">
+                <p style="margin: 4px 0;"><strong>Name:</strong> ${entry.name || '-'}</p>
+                <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${entry.status || 'Kein Status'}</span></p>
+                <p style="margin: 4px 0; font-size: 0.9em; color: var(--text-color-muted);" title="${entry.notes || ''}"><strong>Notiz:</strong> ${notesPreview}</p>
+                <p style="margin: 8px 0 4px; font-size: 0.8em; color: var(--text-color-light);">Letzter Besuch: ${visitDate}</p>
+            </div>
+            <div class="card-actions" style="margin-top: 12px; text-align: right; padding-top:10px; border-top: 1px solid var(--border-color-soft)">
+                 <button onclick="editHouseEntry('${entry.id}')" class="buttonnumpad icon-button" title="Bearbeiten">✏️</button>
+                 <button onclick="deleteHouseEntry('${entry.id}')" class="buttonnumpad icon-button danger" title="Löschen">❌</button>
+            </div>
+        `;
+        // Stil für Buttons (muss ggf. in CSS zentralisiert werden)
+        // .icon-button { font-size:0.9em; padding: 5px 8px; width:auto; height:auto; margin-left: 5px; }
+        // .icon-button.danger { background-color: var(--danger-color); }
+
+
         listContainer.appendChild(item);
     });
 }
 
 async function saveOrUpdateHouseEntry() {
     const houseNumber = document.getElementById('houseNumberInput').value.trim();
-    const name = document.getElementById('nameInput').value.trim(); // Neuen Namen abrufen
+    const name = document.getElementById('nameInput').value.trim();
     const status = document.getElementById('statusSelect').value;
     const notes = document.getElementById('notesInput').value.trim();
 
@@ -652,69 +672,67 @@ async function saveOrUpdateHouseEntry() {
     loadingIndicator.textContent = "Speichere Eintrag...";
     loadingIndicator.style.display = 'block';
 
-    const entryData = {
+    const entryDataForUpdate = { // Daten, die bei jedem Update gesetzt werden
         street_id: currentSelectedStreetId,
-        user_id: currentUser.id,
+        user_id: currentUser.id, // ID des letzten Bearbeiters
         house_number: houseNumber,
-        name: name || null, // Optionaler Name
-        status: status || null, // Leeren String als null speichern
+        name: name || null,
+        status: status || null,
         notes: notes || null,
-        last_visit_date: new Date().toISOString() // Aktuelles Datum als letzter Besuch
+        last_visit_date: new Date().toISOString()
     };
 
     try {
         let result;
         if (currentEditingEntryId) {
-            // Update
+            // Update: Jeder darf aktualisieren. creator_id wird NICHT geändert.
             console.log(`Aktualisiere Eintrag ${currentEditingEntryId}`);
             const { data, error } = await supabaseClient
                 .from('house_entries')
-                .update(entryData)
-                .eq('id', currentEditingEntryId)
-                .eq('user_id', currentUser.id); // Zusätzliche Sicherheit
+                .update(entryDataForUpdate) // Nur die relevanten Felder für Update
+                .eq('id', currentEditingEntryId);
              if (error) throw error;
              result = data;
         } else {
-             // Prüfen ob Eintrag für Hausnummer schon existiert um Dupletten zu vermeiden
-             const { data: existing, error: checkError } = await supabaseClient
-                 .from('house_entries')
-                 .select('id')
-                 .eq('street_id', currentSelectedStreetId)
-                 .eq('house_number', houseNumber)
-                 .maybeSingle();
+            // Prüfen ob Eintrag für Hausnummer schon existiert (global für die Straße)
+            const { data: existing, error: checkError } = await supabaseClient
+                .from('house_entries')
+                .select('id, creator_id') // Lade ggf. creator_id, falls benötigt für Logik
+                .eq('street_id', currentSelectedStreetId)
+                .eq('house_number', houseNumber)
+                .maybeSingle();
 
-             if (checkError) throw checkError;
+            if (checkError) throw checkError;
 
-             if (existing) {
-                 // Eintrag existiert, stattdessen aktualisieren? Oder Fehler zeigen?
-                 // Hier: Aktualisieren statt neu anlegen
-                 console.log(`Eintrag für Hausnummer ${houseNumber} existiert, aktualisiere stattdessen.`);
-                  const { data, error } = await supabaseClient
-                      .from('house_entries')
-                      .update(entryData)
-                      .eq('id', existing.id)
-                      .eq('user_id', currentUser.id);
-                  if (error) throw error;
-                  result = data;
-                 // Alternative: Fehler zeigen
-                 // showError(`Eintrag für Hausnummer ${houseNumber} existiert bereits. Bearbeiten Sie den vorhandenen Eintrag.`);
-                 // loadingIndicator.style.display = 'none';
-                 // return;
-             } else {
-                 // Insert
-                 console.log(`Füge neuen Eintrag hinzu für Hausnummer ${houseNumber}`);
-                 const { data, error } = await supabaseClient
-                     .from('house_entries')
-                     .insert(entryData);
-                  if (error) throw error;
-                  result = data;
-             }
+            if (existing) {
+                // Eintrag existiert, stattdessen aktualisieren.
+                // creator_id wird NICHT geändert.
+                console.log(`Eintrag für Hausnummer ${houseNumber} existiert, aktualisiere stattdessen.`);
+                const { data, error } = await supabaseClient
+                    .from('house_entries')
+                    .update(entryDataForUpdate) // Nur die relevanten Felder für Update
+                    .eq('id', existing.id);
+                if (error) throw error;
+                result = data;
+            } else {
+                // Insert: Neuer Eintrag wird mit user_id und creator_id des aktuellen Users erstellt
+                console.log(`Füge neuen Eintrag hinzu für Hausnummer ${houseNumber}`);
+                const entryDataForInsert = {
+                    ...entryDataForUpdate, // Übernimmt alle Felder von oben
+                    creator_id: currentUser.id // Setzt den ursprünglichen Ersteller
+                };
+                const { data, error } = await supabaseClient
+                    .from('house_entries')
+                    .insert(entryDataForInsert);
+                if (error) throw error;
+                result = data;
+            }
         }
 
         console.log("Eintrag erfolgreich gespeichert/aktualisiert.");
-        clearHouseEntryForm(); // Formular leeren
-        await loadHouseEntries(currentSelectedStreetId); // Liste neu laden
-        displayHouseEntries(); // Liste neu anzeigen
+        clearHouseEntryForm();
+        await loadHouseEntries(currentSelectedStreetId); // Lädt auch die neuen Spalten, wenn SELECT * ist
+        displayHouseEntries();
 
     } catch (error) {
         console.error("Fehler beim Speichern/Aktualisieren:", error);
@@ -730,12 +748,22 @@ function editHouseEntry(entryId) {
     if (!entry) return;
 
     document.getElementById('houseNumberInput').value = entry.house_number || '';
+    document.getElementById('nameInput').value = entry.name || '';
     document.getElementById('statusSelect').value = entry.status || '';
     document.getElementById('notesInput').value = entry.notes || '';
     currentEditingEntryId = entry.id; // Merken, welcher Eintrag bearbeitet wird
 
     // Optional: Zum Formular scrollen
-    document.getElementById('houseEntryForm').scrollIntoView({ behavior: 'smooth' });
+    const formElement = document.getElementById('houseEntryForm');
+    if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth' });
+        // Fokus auf das erste Feld setzen für bessere UX, z.B. Hausnummer oder Name
+        const houseNumberField = document.getElementById('houseNumberInput');
+        if (houseNumberField) {
+            // Kurze Verzögerung, um sicherzustellen, dass scrollIntoView abgeschlossen ist
+            setTimeout(() => houseNumberField.focus(), 100);
+        }
+    }
 }
 
 // Löscht einen Hausnummern-Eintrag
@@ -747,17 +775,20 @@ async function deleteHouseEntry(entryId) {
     loadingIndicator.style.display = 'block';
 
     try {
+            // WICHTIG: Die user_id Bedingung bleibt hier bestehen,
+            // da nur der Ersteller des Eintrags löschen darf.
+            // Die Supabase Policy für DELETE muss 'auth.uid() = user_id' (Spalte im Eintrag) sein.
             const { error } = await supabaseClient
             .from('house_entries')
             .delete()
             .eq('id', entryId)
-            .eq('user_id', currentUser.id); // Sicherheit
+            .eq('user_id', currentUser.id); // Stellt sicher, dass nur der Ersteller löscht
 
         if (error) throw error;
 
         console.log(`Eintrag ${entryId} gelöscht.`);
-        await loadHouseEntries(currentSelectedStreetId); // Liste neu laden
-        displayHouseEntries(); // Liste neu anzeigen
+        await loadHouseEntries(currentSelectedStreetId);
+        displayHouseEntries();
 
     } catch (error) {
         console.error("Fehler beim Löschen:", error);
@@ -1060,36 +1091,42 @@ async function loadStatsData() {
     statsLoadingIndicator.style.display = 'block';
 
     try {
+        // Hole alle Einträge, die vom aktuellen Benutzer ERSTELLT wurden
         const { data: entries, error } = await supabaseClient
             .from('house_entries')
-            .select('status') // Nur den Status abrufen
-            .eq('user_id', currentUser.id);
+            .select('status, creator_id') // Stelle sicher, dass creator_id mit abgefragt wird
+            .eq('creator_id', currentUser.id); // Filtere nach dem Ersteller
 
         if (error) throw error;
 
-        // Statistiken berechnen
-        const totalEntries = entries.length;
+        // Statistiken berechnen (nur für die Einträge dieses Users)
+        const totalEntries = entries.length; // Gesamtanzahl der vom User erstellten Einträge
         const statusCounts = {
-            'Abgeschlossen': 0,
-            'Interessiert': 0,
+            'Geschrieben': 0,
             'Kein Interesse': 0,
-            'Erneut besuchen': 0,
-            'Nicht angetroffen': 0,
-            'Andere': 0, // Auch 'Andere' zählen
-            'null': 0 // Einträge ohne Status zählen
+            'Nicht geöffnet': 0,
+            'Andere': 0,
+            'null': 0 // Für Einträge ohne Status
         };
 
         entries.forEach(entry => {
-            const status = entry.status || 'null'; // Fallback für null/leeren Status
+            const status = entry.status || 'null';
             if (statusCounts.hasOwnProperty(status)) {
                 statusCounts[status]++;
             } else {
-                 statusCounts['Andere']++; // Unbekannte Stati zu 'Andere'
+                 // Falls ein unerwarteter Status auftaucht, zähle ihn zu 'Andere'
+                 // oder logge einen Fehler, je nach gewünschtem Verhalten.
+                 // Für jetzt: Zähle zu 'Andere', wenn nicht explizit 'null'
+                 if (status !== 'null') {
+                    statusCounts['Andere']++;
+                 } else {
+                    statusCounts['null']++; // Explizit null-Status zählen
+                 }
             }
         });
 
         displayStatsData(totalEntries, statusCounts);
-        renderStatusChart(statusCounts); // Chart rendern
+        renderStatusChart(statusCounts);
 
         statsContent.style.display = 'block';
 
@@ -1110,29 +1147,27 @@ async function loadLeaderboardData() {
     leaderboardLoadingIndicator.style.display = 'block';
 
     try {
-        // === GEÄNDERT: Aufruf der SQL RPC Funktion statt Edge Function ===
-        console.log("Rufe RPC Funktion 'get_leaderboard_data' auf...");
+        // Die RPC-Funktion muss angepasst werden, um creator_id zu verwenden
+        console.log("Rufe RPC Funktion 'get_leaderboard_data_v2' auf (oder anpassen)..."); // Neuer Name oder Hinweis zur Anpassung
         const { data: leaderboardEntries, error: rpcError } = await supabaseClient
-            .rpc('get_leaderboard_data'); // Der Name der SQL-Funktion
+            .rpc('get_leaderboard_data_v2'); // VORSCHLAG: Neue RPC-Funktion
 
         if (rpcError) {
-            console.error("Fehler beim RPC-Aufruf 'get_leaderboard_data':", rpcError);
+            console.error("Fehler beim RPC-Aufruf 'get_leaderboard_data_v2':", rpcError);
             throw new Error(`Fehler beim Abrufen des Leaderboards: ${rpcError.message}`);
         }
 
-        // Die Daten sollten bereits im korrekten Format sein
         if (!leaderboardEntries || !Array.isArray(leaderboardEntries)) {
              console.error("Ungültige Daten von RPC erhalten:", leaderboardEntries);
             throw new Error("Ungültige Daten vom Leaderboard-Endpunkt erhalten.");
         }
-        // === ENDE ÄNDERUNG ===
 
-        displayLeaderboardData(leaderboardEntries); // Verwende die Daten direkt
+        displayLeaderboardData(leaderboardEntries);
         leaderboardContent.style.display = 'block';
 
     } catch (error) {
         console.error("Fehler beim Laden des Leaderboards:", error);
-        leaderboardErrorDisplay.textContent = `${error.message}`; // Zeige die spezifische Fehlermeldung
+        leaderboardErrorDisplay.textContent = `${error.message}`;
         leaderboardErrorDisplay.style.display = 'block';
     } finally {
         leaderboardLoadingIndicator.style.display = 'none';
@@ -1176,39 +1211,91 @@ async function loadSettingsData() {
 // --- Anzeige-/Renderfunktionen ---
 
 function displayStatsData(total, counts) {
-    statTotalEntries.textContent = total;
-    statCompletedEntries.textContent = counts['Abgeschlossen'] || 0;
-    statInterestedEntries.textContent = counts['Interessiert'] || 0;
-    statNotInterestedEntries.textContent = counts['Kein Interesse'] || 0;
-    statRevisitEntries.textContent = counts['Erneut besuchen'] || 0;
-    statNotMetEntries.textContent = counts['Nicht angetroffen'] || 0;
-    // Optional: Zeige 'Andere' oder 'Ohne Status' an, wenn gewünscht
+    if (statTotalEntries) statTotalEntries.textContent = total;
+
+    // Zähler für die aktuellen/neuen Status-Kategorien aktualisieren
+    // und sicherstellen, dass ihre Container sichtbar sind.
+    if (statGeschriebenEntries) {
+        statGeschriebenEntries.textContent = counts['Geschrieben'] || 0;
+        if (statGeschriebenEntries.parentElement) statGeschriebenEntries.parentElement.style.display = '';
+    }
+    if (statNotInterestedEntries) { // ID für "Kein Interesse"
+        statNotInterestedEntries.textContent = counts['Kein Interesse'] || 0;
+        if (statNotInterestedEntries.parentElement) statNotInterestedEntries.parentElement.style.display = '';
+    }
+    if (statNichtGeoeffnetEntries) {
+        statNichtGeoeffnetEntries.textContent = counts['Nicht geöffnet'] || 0;
+        if (statNichtGeoeffnetEntries.parentElement) statNichtGeoeffnetEntries.parentElement.style.display = '';
+    }
+    
+    // Dynamisch nach dem Element für "Andere" suchen, da es neu sein könnte
+    const statAndere = document.getElementById('statAndereEntries'); 
+    if (statAndere) {
+        statAndere.textContent = (counts['Andere'] || 0) + (counts['null'] || 0); // "Andere" und "null" zusammenfassen
+        if (statAndere.parentElement) statAndere.parentElement.style.display = '';
+    }
+
+    // HTML-Elemente für alte, nicht mehr verwendete Status-Kategorien ausblenden,
+    // falls sie noch im DOM existieren und nicht identisch mit einem der neuen Elemente sind.
+    if (statCompletedEntries && statCompletedEntries !== statGeschriebenEntries) {
+        if (statCompletedEntries.parentElement) statCompletedEntries.parentElement.style.display = 'none';
+    }
+    // statInterestedEntries ist eine alte Kategorie. statNotInterestedEntries ist die aktuelle für "Kein Interesse".
+    if (statInterestedEntries && statInterestedEntries !== statNotInterestedEntries) { 
+        if (statInterestedEntries.parentElement) statInterestedEntries.parentElement.style.display = 'none';
+    }
+    if (statRevisitEntries) { // Diese Kategorie ist komplett entfallen
+        if (statRevisitEntries.parentElement) statRevisitEntries.parentElement.style.display = 'none';
+    }
+    if (statNotMetEntries && statNotMetEntries !== statNichtGeoeffnetEntries) {
+        if (statNotMetEntries.parentElement) statNotMetEntries.parentElement.style.display = 'none';
+    }
 }
 
 function renderStatusChart(statusCounts) {
     if (!statusChartCanvas) return;
     const ctx = statusChartCanvas.getContext('2d');
 
-    // Zerstöre alte Instanz, falls vorhanden
+    // Zerstöre alte Instanz, falls vorhanden, und setze die Referenz zurück
     if (statsChartInstance) {
         statsChartInstance.destroy();
+        statsChartInstance = null;
     }
 
     // Bereite Daten für Chart.js vor
-    const labels = Object.keys(statusCounts).filter(status => status !== 'null' && statusCounts[status] > 0); // 'null' ignorieren, nur Stati mit >0 Einträgen
+    const labels = Object.keys(statusCounts).filter(status => status !== 'null' && statusCounts[status] > 0);
     const dataValues = labels.map(label => statusCounts[label]);
+
+    // Wenn keine Daten vorhanden sind, zeige eine Nachricht an und rendere das Chart nicht
+    if (labels.length === 0) {
+        console.warn("Keine Daten für das Status-Chart vorhanden. Chart wird nicht gerendert.");
+        ctx.clearRect(0, 0, statusChartCanvas.width, statusChartCanvas.height); // Canvas leeren
+        // Nachricht auf dem Canvas anzeigen
+        ctx.font = "16px Segoe UI, Arial, sans-serif"; // Passende Schriftart
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-color-muted').trim() || "#6c757d"; // Dynamische Textfarbe
+        ctx.textAlign = "center";
+        ctx.fillText("Keine Daten für Diagramm vorhanden", statusChartCanvas.width / 2, statusChartCanvas.height / 2);
+        return; // Wichtig: Funktion hier beenden
+    }
 
     // Farben für die Segmente (Beispiel, anpassen!)
     const backgroundColors = [
-        '#16a34a', // Abgeschlossen (Grün)
-        '#2563eb', // Interessiert (Blau)
-        '#dc2626', // Kein Interesse (Rot)
-        '#f59e0b', // Erneut besuchen (Gelb/Orange)
-        '#6b7280', // Nicht angetroffen (Grau)
-        '#0284c7'  // Andere (Helles Blau)
+        'var(--success-color, #16a34a)', // Geschrieben (Grün)
+        'var(--danger-color, #dc2626)',  // Kein Interesse (Rot)
+        'var(--warning-color, #f59e0b)', // Nicht geöffnet (Gelb/Orange)
+        'var(--info-color, #0284c7)'    // Andere (Helles Blau) / oder ein neutrales Grau
     ];
      // Sicherstellen, dass wir genug Farben haben (ggf. wiederholen)
-     const chartColors = dataValues.map((_, index) => backgroundColors[index % backgroundColors.length]);
+     const chartColors = dataValues.map((_, index) => {
+        const statusName = labels[index];
+        switch(statusName) {
+            case 'Geschrieben': return backgroundColors[0];
+            case 'Kein Interesse': return backgroundColors[1];
+            case 'Nicht geöffnet': return backgroundColors[2];
+            case 'Andere': return backgroundColors[3];
+            default: return '#6b7280'; // Fallback Grau
+        }
+     });
 
     // Definiere die Hintergrundfarbe aus den CSS Variablen (oder hardcode sie)
     // const cardBgColor = getComputedStyle(document.documentElement).getPropertyValue('--card-bg').trim() || '#f8fafc'; // Dynamisch holen

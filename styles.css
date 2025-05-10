@@ -376,6 +376,7 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* Leichter Schatten für Tiefe */
     z-index: 1000;
     border-top: 1px solid var(--card-border);
+    padding: 40px 0;
 }
 
 .nav-item {
@@ -422,27 +423,23 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
     /* Wird von JS ein-/ausgeblendet */
 }
 
+/* In deiner styles.css Datei */
+
 .alphabet-button {
-    /* Nimmt generische Button-Stile an, aber angepasst */
-    padding: 0; /* Kein Padding, fixe Größe */
-    width: 30px; /* Breite */
-    height: 30px; /* Höhe */
-    min-width: 30px; /* Mindestbreite sicherstellen */
-    font-size: 0.9rem; /* Passende Schriftgröße */
-    font-weight: 600;
-    border-radius: 50%; /* Rund */
-    background-color: #e2e8f0; /* Heller Hintergrund für Buttons */
-    color: var(--text-color);
-    border: 1px solid transparent; /* Platzhalter für Rand */
-    cursor: pointer;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
-    /* Flex-Eigenschaften entfernen, die vom generischen Button kommen könnten */
-    flex-grow: 0;
-    flex-shrink: 0;
-    display: inline-flex; /* Wichtig für Zentrierung */
-    align-items: center;
+    /* Bestehende Stile beibehalten oder anpassen */
+    padding: 10px 12px; /* Mehr Innenabstand oben/unten und seitlich */
+    font-size: 1.1em;   /* Größere Schrift */
+    min-width: 40px;    /* Mindestbreite, um sicherzustellen, dass auch schmale Buchstaben gut klickbar sind */
+    min-height: 40px;   /* Mindesthöhe */
+    display: inline-flex; /* Stellt sicher, dass padding korrekt angewendet wird und der Inhalt zentriert ist */
     justify-content: center;
+    align-items: center;
+    margin: 3px;        /* Etwas Abstand zwischen den Buttons */
+    border-radius: 6px; /* Leicht abgerundete Ecken, falls gewünscht */
+    /* Weitere Stile wie Hintergrund, Farbe, Rand etc. hier oder beibehalten */
 }
+
+
 
 .alphabet-button:hover {
     background-color: #cbd5e1; /* Dunklerer Hover */
