@@ -9,6 +9,7 @@ let currentHouseEntries = []; // Einträge für die aktuell ausgewählte Straße
 let currentEditingEntryId = null; // ID des Eintrags, der gerade bearbeitet wird
 let statsChartInstance = null; // Variable für die Chart-Instanz
 let currentAlphabetFilter = null; // Aktuell ausgewählter Buchstabe
+let currentSortOrder = 'house_number_asc'; // NEU: Standard-Sortierreihenfolge
 
 // --- DOM Elemente ---
 const loginContainer = document.getElementById('loginContainer');
@@ -440,9 +441,9 @@ async function selectStreet(streetName, postalCode) {
     loadingIndicator.textContent = `Lade Daten für ${streetName}...`;
     loadingIndicator.style.display = 'block';
     streetListContainer.style.display = 'none'; // Straßenliste ausblenden
-    // === NEU: Alphabet-Filter ausblenden, wenn Straße ausgewählt wird ===
     if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
-    // === ENDE NEU ===
+    
+    currentSortOrder = 'house_number_asc'; // Standard-Sortierung für neu ausgewählte Straße setzen
 
     try {
         // 1. Prüfen, ob Straße global existiert (ohne user_id Filter)
@@ -545,10 +546,10 @@ function renderStreetDetailView(streetName) {
         </div>
         <select id="statusSelect" style="width: 100%; margin-bottom: 12px; ${inputStyle}">
             <option value="">-- Status --</option>
-            <option value="Geschrieben">Geschrieben</option>
-            <option value="Kein Interesse">Kein Interesse</option>
-            <option value="Nicht geöffnet">Nicht geöffnet</option>
-            <option value="Andere">Andere</option>
+            <option value="Geschrieben">✅ Geschrieben</option>
+            <option value="Kein Interesse">❌ Kein Interesse</option>
+            <option value="Nicht geöffnet">🔒 Nicht geöffnet</option>
+            <option value="Andere">🔍 Andere</option>
         </select>
         <textarea id="notesInput" placeholder="Notizen..." style="width: 100%; min-height: 80px; margin-bottom: 15px; ${inputStyle}"></textarea>
         <div class="form-button-group">
@@ -582,6 +583,34 @@ function renderStreetDetailView(streetName) {
     if(statusSelect) statusSelect.addEventListener('keydown', formEnterHandler);
     // === ENDE NEU ===
 
+    // Sortier-Steuerung hinzufügen
+    const sortControlsDiv = document.createElement('div');
+    sortControlsDiv.id = 'sortControls';
+    sortControlsDiv.style.marginBottom = '15px';
+    sortControlsDiv.style.marginTop = '20px'; // Etwas Abstand zum Formular
+    sortControlsDiv.style.display = 'flex';
+    sortControlsDiv.style.alignItems = 'center';
+    sortControlsDiv.style.gap = '10px';
+    // inputStyle ist im Scope von renderStreetDetailView definiert
+    sortControlsDiv.innerHTML = `
+        <label for="sortSelect" style="font-weight: bold; white-space: nowrap;">Sortieren nach:</label>
+        <select id="sortSelect" style="flex-grow: 1; padding: 10px; border: 1px solid var(--border-color, #ccc); border-radius: 5px; background-color: var(--input-bg, white); color: var(--text-color, black); box-sizing: border-box;">
+            <option value="house_number_asc">Hausnr. (aufsteigend)</option>
+            <option value="house_number_desc">Hausnr. (absteigend)</option>
+            <option value="created_at_desc">Zuletzt hinzugefügt</option>
+        </select>
+    `;
+    streetDetailContainer.appendChild(sortControlsDiv);
+
+    const sortSelectElement = sortControlsDiv.querySelector('#sortSelect');
+    if (sortSelectElement) {
+        sortSelectElement.value = currentSortOrder; // Aktuelle Sortierung im Dropdown setzen
+        sortSelectElement.addEventListener('change', (event) => {
+            currentSortOrder = event.target.value;
+            sortAndDisplayHouseEntries(); // Einträge neu sortieren und anzeigen
+        });
+    }
+
     // Fokus auf Hausnummernfeld setzen
     if (houseNumberInput) {
         setTimeout(() => { // setTimeout gibt dem Browser Zeit, das Element sicher zu rendern
@@ -595,16 +624,49 @@ function renderStreetDetailView(streetName) {
     listDiv.style.marginTop = '20px';
     streetDetailContainer.appendChild(listDiv);
 
-    // Einträge in die Liste rendern
-    displayHouseEntries();
+    // Einträge in die Liste rendern (initial sortiert nach currentSortOrder)
+    sortAndDisplayHouseEntries();
+}
+
+// NEUE FUNKTION: Sortiert die currentHouseEntries und ruft displayHouseEntries auf
+function sortAndDisplayHouseEntries() {
+    if (!currentHouseEntries) return;
+
+    currentHouseEntries.sort((a, b) => {
+        let comparisonResult = 0;
+        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+        switch (currentSortOrder) {
+            case 'house_number_asc':
+                comparisonResult = collator.compare(a.house_number || '', b.house_number || '');
+                break;
+            case 'house_number_desc':
+                comparisonResult = collator.compare(b.house_number || '', a.house_number || ''); // Reihenfolge für absteigend getauscht
+                break;
+            case 'created_at_desc':
+                // Annahme: created_at ist ein ISO-String Datum oder Timestamp
+                const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+                const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+                comparisonResult = dateB - dateA; // Neueste zuerst
+                break;
+            default:
+                // Fallback zur Standardsortierung (Hausnummer aufsteigend)
+                comparisonResult = collator.compare(a.house_number || '', b.house_number || '');
+                break;
+        }
+        return comparisonResult;
+    });
+
+    displayHouseEntries(); // Ruft die Funktion auf, die nur noch für die Anzeige zuständig ist
 }
 
 // Zeigt die aktuellen Hausnummern-Einträge in der Liste an
+// Diese Funktion ist jetzt nur noch für das Rendern der (bereits sortierten) Liste zuständig.
 function displayHouseEntries() {
     const listContainer = document.getElementById('houseEntriesList');
-    if (!listContainer) return; // Sicherstellen, dass der Container da ist
+    if (!listContainer) return;
 
-    listContainer.innerHTML = ''; // Liste leeren
+    listContainer.innerHTML = '';
 
     // Grid-Layout für die Liste
     listContainer.style.display = 'grid';
@@ -620,33 +682,27 @@ function displayHouseEntries() {
     currentHouseEntries.forEach(entry => {
         const item = document.createElement('div');
         item.className = 'house-entry-item card'; // Klasse für Styling hinzufügen + 'card' für konsistenten Look
-        // item.style.padding = '15px'; // Wird durch card-Style ggf. übernommen
-        // item.style.border = '1px solid var(--border-color)'; // Konsistenter Rand
-        // item.style.borderRadius = '8px'; // Abgerundete Ecken
-        // item.style.backgroundColor = 'var(--card-bg)'; // Hintergrund
-        // item.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'; // Leichter Schatten
 
         const visitDate = entry.last_visit_date ? new Date(entry.last_visit_date).toLocaleDateString('de-DE') : 'Unbekannt';
-        const notesPreview = entry.notes ? entry.notes.substring(0, 70) + (entry.notes.length > 70 ? '...' : '') : '-';
+        const notesPreview = entry.notes ? escapeHtml(entry.notes.substring(0, 70) + (entry.notes.length > 70 ? '...' : '')) : '-';
         
-        // Status farblich hervorheben (optional, Beispiel)
-        let statusColor = 'var(--text-color-muted)'; // Standardfarbe
+        let statusColor = 'var(--text-color-muted)';
         switch(entry.status) {
             case 'Geschrieben': statusColor = 'var(--success-color)'; break;
             case 'Kein Interesse': statusColor = 'var(--danger-color)'; break;
             case 'Nicht geöffnet': statusColor = 'var(--warning-color)'; break;
-            // 'Andere' behält Standard oder eine spezifische Farbe
         }
 
-
         item.innerHTML = `
-            <div class="card-header" style="padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color);">
-                <strong style="font-size: 1.1em;">Hausnr: ${entry.house_number || 'N/A'}</strong>
+            <div class="card-header" style="padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color-soft);">
+                <span style="background-color: var(--primary-color, #0d6efd); color: white; padding: 0.4em 0.7em; border-radius: 6px; font-weight: bold; font-size: 1.3em; line-height: 1; display: inline-block; min-width: 36px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    ${entry.house_number || '?'}
+                </span>
             </div>
             <div class="card-content">
-                <p style="margin: 4px 0;"><strong>Name:</strong> ${entry.name || '-'}</p>
-                <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${entry.status || 'Kein Status'}</span></p>
-                <p style="margin: 4px 0; font-size: 0.9em; color: var(--text-color-muted);" title="${entry.notes || ''}"><strong>Notiz:</strong> ${notesPreview}</p>
+                <p style="margin: 4px 0;"><strong>Name:</strong> ${escapeHtml(entry.name) || '-'}</p>
+                <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${escapeHtml(entry.status) || 'Kein Status'}</span></p>
+                <p style="margin: 4px 0; font-size: 0.9em; color: var(--text-color-muted);" title="${escapeHtml(entry.notes || '')}"><strong>Notiz:</strong> ${notesPreview}</p>
                 <p style="margin: 8px 0 4px; font-size: 0.8em; color: var(--text-color-light);">Letzter Besuch: ${visitDate}</p>
             </div>
             <div class="card-actions" style="margin-top: 12px; text-align: right; padding-top:10px; border-top: 1px solid var(--border-color-soft)">
@@ -654,11 +710,6 @@ function displayHouseEntries() {
                  <button onclick="deleteHouseEntry('${entry.id}')" class="buttonnumpad icon-button danger" title="Löschen">❌</button>
             </div>
         `;
-        // Stil für Buttons (muss ggf. in CSS zentralisiert werden)
-        // .icon-button { font-size:0.9em; padding: 5px 8px; width:auto; height:auto; margin-left: 5px; }
-        // .icon-button.danger { background-color: var(--danger-color); }
-
-
         listContainer.appendChild(item);
     });
 }
@@ -760,7 +811,9 @@ async function saveOrUpdateHouseEntry() {
         if (saveButton) {
             saveButton.textContent = 'Gespeichert ✓';
             saveButton.classList.remove('saving');
-            saveButton.classList.add('saved'); // Für anderes Styling, falls gewünscht
+            saveButton.classList.add('saved'); // Diese CSS-Klasse sollte den Button grün färben.
+                                             // Füge in deiner styles.css hinzu:
+                                             // .saved { background-color: var(--success-color) !important; color: white !important; border-color: var(--success-color) !important; }
             setTimeout(() => {
                 saveButton.textContent = originalButtonText;
                 saveButton.disabled = false;
@@ -770,7 +823,7 @@ async function saveOrUpdateHouseEntry() {
         
         clearHouseEntryForm();
         await loadHouseEntries(currentSelectedStreetId); 
-        displayHouseEntries();
+        sortAndDisplayHouseEntries(); // Statt displayHouseEntries direkt aufzurufen
 
     } catch (error) {
         console.error("Fehler beim Speichern/Aktualisieren:", error);
@@ -836,7 +889,7 @@ async function deleteHouseEntry(entryId) {
 
         console.log(`Eintrag ${entryId} gelöscht.`);
         await loadHouseEntries(currentSelectedStreetId);
-        displayHouseEntries();
+        sortAndDisplayHouseEntries(); // Statt displayHouseEntries direkt aufzurufen
 
     } catch (error) {
         console.error("Fehler beim Löschen:", error);
@@ -1327,7 +1380,6 @@ function renderStatusChart(statusCounts) {
     let chartDataValues = [];
     let chartBackgroundColors = [];
 
-    // Funktion, um berechnete Farbwerte zu erhalten
     const getComputedColor = (cssVar, fallbackColor) => {
         try {
             const color = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
@@ -1345,6 +1397,18 @@ function renderStatusChart(statusCounts) {
         'Andere': getComputedColor('--info-color', '#0284c7')
     };
 
+    let totalCountForPercentage = 0;
+    definedCategories.forEach(category => {
+        let count = 0;
+        if (category === 'Andere') {
+            count = (statusCounts['Andere'] || 0) + (statusCounts['null'] || 0);
+        } else {
+            count = statusCounts[category] || 0;
+        }
+        totalCountForPercentage += count; // Gesamtzahl für Prozentberechnung
+    });
+
+
     definedCategories.forEach(category => {
         let count = 0;
         if (category === 'Andere') {
@@ -1353,14 +1417,17 @@ function renderStatusChart(statusCounts) {
             count = statusCounts[category] || 0;
         }
 
-        if (count > 0) {
+        // Nur Kategorien mit Werten > 0 zum Diagramm hinzufügen,
+        // es sei denn, es gibt gar keine Daten, dann wird eine Nachricht angezeigt.
+        if (count > 0 || totalCountForPercentage === 0) {
             chartLabels.push(category);
             chartDataValues.push(count);
             chartBackgroundColors.push(categoryColors[category] || '#6b7280');
         }
     });
 
-    if (chartLabels.length === 0) {
+
+    if (chartLabels.length === 0 || totalCountForPercentage === 0) {
         console.warn("Keine Daten für das Status-Chart vorhanden (alle relevanten Kategorien sind 0). Chart wird nicht gerendert.");
         ctx.clearRect(0, 0, statusChartCanvas.width, statusChartCanvas.height);
         let textColor = getComputedColor('--text-color-muted', '#6c757d');
@@ -1373,6 +1440,7 @@ function renderStatusChart(statusCounts) {
 
     const cardBgColor = getComputedColor('--card-bg', '#f8fafc');
     const legendTextColor = getComputedColor('--text-color', '#1e293b');
+    const datalabelsColor = getComputedColor('--chart-datalabel-color', '#ffffff'); // Eigene Variable für Label-Farbe
 
     statsChartInstance = new Chart(ctx, {
         type: 'pie',
@@ -1397,7 +1465,7 @@ function renderStatusChart(statusCounts) {
                         color: legendTextColor
                     }
                 },
-                tooltip: {
+                tooltip: { // Tooltips können optional beibehalten oder deaktiviert werden (enabled: false)
                     callbacks: {
                         label: function(context) {
                             let label = context.label || '';
@@ -1407,7 +1475,6 @@ function renderStatusChart(statusCounts) {
                             const value = context.parsed || 0;
                             label += value;
 
-                            // Prozentsatz berechnen und hinzufügen
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             if (total > 0) {
                                 const percentage = ((value / total) * 100).toFixed(1) + '%';
@@ -1416,6 +1483,33 @@ function renderStatusChart(statusCounts) {
                             return label;
                         }
                     }
+                },
+                datalabels: { // Konfiguration für chartjs-plugin-datalabels
+                    display: true,
+                    formatter: (value, context) => {
+                        const label = context.chart.data.labels[context.dataIndex];
+                        const dataset = context.chart.data.datasets[0];
+                        const total = dataset.data.reduce((acc, dataVal) => acc + dataVal, 0);
+                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0.0%';
+                        
+                        // Nur anzeigen, wenn der Prozentsatz z.B. über 5% liegt, um Überlappung zu vermeiden
+                        if (parseFloat(percentage) < 5 && total > 0) {
+                            return null; // Label für kleine Segmente ausblenden
+                        }
+                        return `${label}\n${percentage}`; // Kategoriename und darunter der Prozentsatz
+                    },
+                    color: datalabelsColor, // Farbe der Schrift, z.B. weiß für gute Lesbarkeit auf farbigen Segmenten
+                    textAlign: 'center',
+                    font: {
+                        weight: 'bold',
+                        size: 10, // Passe die Schriftgröße nach Bedarf an
+                    },
+                    anchor: 'center', // Position des Ankerpunkts des Labels
+                    align: 'center',  // Ausrichtung des Labels relativ zum Ankerpunkt
+                    // Optional: Abstand, wenn die Labels zu nah am Rand sind
+                    // offset: 8,
+                    // Optional: Drehung für bessere Passform (in Grad)
+                    // rotation: 0,
                 }
             }
         }
@@ -1509,6 +1603,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // === WICHTIG: Login Listener schon hier hinzufügen, da Login-Screen zuerst da ist ===
     setupLoginEnterListeners();
     // === ENDE ÄNDERUNG ===
+
+    // Plugin-Registrierung (sicherstellen, dass ChartDataLabels definiert ist)
+    if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
+        Chart.register(ChartDataLabels);
+        console.log("ChartDataLabels Plugin registriert.");
+    } else {
+        console.warn('Chart oder ChartDataLabels Plugin nicht gefunden. Stelle sicher, dass es korrekt eingebunden ist.');
+    }
+
     checkSession();
 });
 
