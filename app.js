@@ -1261,13 +1261,13 @@ async function loadLeaderboardData() {
     leaderboardLoadingIndicator.style.display = 'block';
 
     try {
-        // Die RPC-Funktion muss angepasst werden, um creator_id zu verwenden
-        console.log("Rufe RPC Funktion 'get_leaderboard_data_v2' auf (oder anpassen)..."); // Neuer Name oder Hinweis zur Anpassung
+        // Rufe die neue oder angepasste RPC-Funktion auf
+        console.log("Rufe RPC Funktion 'get_leaderboard_geschrieben_v1' auf...");
         const { data: leaderboardEntries, error: rpcError } = await supabaseClient
-            .rpc('get_leaderboard_data_v2'); // VORSCHLAG: Neue RPC-Funktion
+            .rpc('get_leaderboard_geschrieben_v1'); // NEUER RPC-FUNKTIONSNAME
 
         if (rpcError) {
-            console.error("Fehler beim RPC-Aufruf 'get_leaderboard_data_v2':", rpcError);
+            console.error("Fehler beim RPC-Aufruf 'get_leaderboard_geschrieben_v1':", rpcError);
             throw new Error(`Fehler beim Abrufen des Leaderboards: ${rpcError.message}`);
         }
 
@@ -1521,8 +1521,20 @@ function displayLeaderboardData(leaderboard) {
     if (!leaderboardTableBody) return;
     leaderboardTableBody.innerHTML = ''; // Tabelle leeren
 
+    // Spaltenüberschriften im HTML anpassen oder hier dynamisch setzen, falls nötig.
+    // Angenommen, dein HTML für den Header sieht so aus:
+    // <thead>
+    //   <tr>
+    //     <th>Rang</th>
+    //     <th>Name</th>
+    //     <th>Geschrieben ✅</th>
+    //   </tr>
+    // </thead>
+    // Falls nicht, müsstest du die Header-Zelle für "Geschrieben" hier anpassen oder sicherstellen,
+    // dass sie im HTML schon korrekt ist.
+
     if (leaderboard.length === 0) {
-        leaderboardTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Noch keine Daten für das Leaderboard vorhanden.</td></tr>';
+        leaderboardTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Noch keine "Geschrieben"-Einträge für das Leaderboard vorhanden.</td></tr>';
         return;
     }
 
@@ -1531,14 +1543,23 @@ function displayLeaderboardData(leaderboard) {
         const row = document.createElement('tr');
 
         // Hebe den aktuellen Benutzer hervor
-        if (currentUser && userEntry.id === currentUser.id) {
+        if (currentUser && userEntry.user_id === currentUser.id) { // user_id statt id verwenden, basierend auf RPC
             row.classList.add('current-user-row');
         }
 
+        let rankDisplay = rank.toString();
+        if (rank === 1) {
+            rankDisplay = '🥇 ' + rank;
+        } else if (rank === 2) {
+            rankDisplay = '🥈 ' + rank;
+        } else if (rank === 3) {
+            rankDisplay = '🥉 ' + rank;
+        }
+
         row.innerHTML = `
-            <td>${rank}</td>
+            <td>${rankDisplay}</td>
             <td>${escapeHtml(userEntry.display_name || 'Unbekannt')}</td>
-            <td>${userEntry.completed_count || 0}</td>
+            <td>${userEntry.geschrieben_count || 0}</td>
         `;
         leaderboardTableBody.appendChild(row);
     });

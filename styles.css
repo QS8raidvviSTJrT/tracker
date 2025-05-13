@@ -366,51 +366,68 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
 
 /* --- Navigationsleiste --- */
 .bottom-nav {
+    display: flex;
     position: fixed;
     bottom: 0;
     left: 0;
-    width: 100%;
-    /* Die Höhe der Navigationsleiste passt sich an die Safe Area an */
-    height: calc(var(--nav-height) + var(--safe-area-inset-bottom));
-    background-color: var(--bg-color);
-    display: flex;
-    justify-content: space-around;
-    align-items: flex-start; /* ÄNDERUNG: Elemente oben ausrichten, da Padding unten hinzukommt */
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* Leichter Schatten für Tiefe */
+    right: 0;
+    background-color: var(--primary-bg-color, white); /* Fallback-Farbe, falls Variable nicht definiert */
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
     z-index: 1000;
-    border-top: 1px solid var(--card-border);
-    /* Oberes Padding bleibt, unteres Padding wird durch Safe Area bestimmt */
-    padding: 5px 0 var(--safe-area-inset-bottom) 0;
+
+    /* Definiere eine Basis-Höhe für den Inhalt der Navigationsleiste (Icons, Text, interne Abstände) */
+    --nav-content-height: 50px; /* Du kannst diesen Wert anpassen */
+
+    /* Die Gesamthöhe der Navigationsleiste ist die Inhaltshöhe plus der Safe Area unten */
+    height: calc(var(--nav-content-height) + env(safe-area-inset-bottom));
+
+    /* Das Padding unten sorgt dafür, dass der Inhalt der Navigationsleiste
+       (also die .nav-item Elemente) über der Home-Anzeige/Safe Area von iOS beginnt. */
+    padding-bottom: env(safe-area-inset-bottom);
+
+    /* Stellt sicher, dass Padding und Border nicht zur deklarierten Höhe addiert werden,
+       falls du padding direkt auf .bottom-nav setzen würdest.
+       Für diesen Ansatz mit --nav-content-height ist es sicherer, es explizit zu setzen. */
+    box-sizing: content-box;
 }
 
 .nav-item {
-    background: none;
-    border: none;
-    color: #6b7280; /* Grauer Text für inaktive Items */
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center; /* Zentriert Icon und Text vertikal */
-    flex-grow: 1;
-    height: var(--nav-height); /* Die Klickfläche der Items behält die Basishöhe */
-    padding: 0 5px; 
+    color: var(--text-secondary-color, #757575); /* Fallback */
+    background-color: transparent;
+    border: none;
     cursor: pointer;
-    transition: color 0.2s ease;
-    font-size: 0.7rem; /* Kleinere Schrift für die Labels */
-    line-height: 1.2;  /* Zeilenhöhe für den Text anpassen */
+    text-align: center;
+    font-size: 10px; /* Beibehalten oder anpassen */
+
+    /* Verschiebe den Inhalt (Icon und Text) nach oben innerhalb des Buttons */
+    justify-content: flex-start;
+
+    /* Passe das Padding an, um den Inhalt innerhalb des Items zu positionieren */
+    padding-top: 8px;    /* Abstand des Inhalts (Icon) vom oberen Rand des nav-item */
+    padding-bottom: 5px; /* Kleinerer Abstand unten, der Rest des Platzes wird durch die Höhe der .bottom-nav bereitgestellt */
+
+    /* Stelle sicher, dass die Nav-Items die volle Höhe der .bottom-nav einnehmen.
+       Da .bottom-nav 'display: flex' hat, ist 'align-items: stretch' der Standardwert
+       für Kindelemente, was dies normalerweise bewirkt. height: 100% ist eine explizite Absicherung. */
+    height: 100%;
 }
 
-.nav-item span.material-icons { /* Ziel nur die Icons */
-    font-size: 24px; /* Icons etwas kleiner, um Platz für Text zu schaffen */
-    margin-bottom: 2px; /* Kleiner Abstand zwischen Icon und Text */
-    transition: color 0.2s ease; 
-}
-.nav-item:hover, .nav-item:hover span.material-icons { /* Text und Icon im Hover */
-    color: var(--primary-color); /* Farbe ändern beim Hover */
+.nav-item .material-icons {
+    font-size: 24px; /* Beibehalten oder anpassen */
+    margin-bottom: 2px; /* Abstand zwischen Icon und Label, anpassen falls 'gap' verwendet wird */
 }
 
-.nav-item.active, .nav-item.active span.material-icons { /* Text und Icon im active state */
-    color: var(--primary-color); /* Aktives Item hervorheben */
+.nav-item .nav-label {
+    font-size: 10px; /* Beibehalten oder anpassen */
+    display: block; /* Stellt sicher, dass es unter dem Icon steht */
+}
+
+.nav-item.active {
+    color: var(--primary-color, #007bff); /* Fallback */
 }
 
 /* --- Stile für Straßen/PLZ Suche (innerhalb mainView) --- */
