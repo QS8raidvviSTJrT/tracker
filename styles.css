@@ -376,7 +376,7 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
     z-index: 1000;
 
     /* Definiere eine Basis-Höhe für den Inhalt der Navigationsleiste (Icons, Text, interne Abstände) */
-    --nav-content-height: 50px; /* Du kannst diesen Wert anpassen */
+    --nav-content-height: 60px; /* Du kannst diesen Wert anpassen */
 
     /* Die Gesamthöhe der Navigationsleiste ist die Inhaltshöhe plus der Safe Area unten */
     height: calc(var(--nav-content-height) + env(safe-area-inset-bottom));
