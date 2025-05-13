@@ -532,13 +532,12 @@ function renderStreetDetailView(streetName) {
     // Überschrift und Zurück-Button
     const headerDiv = document.createElement('div');
     headerDiv.style.display = 'flex';
-    headerDiv.style.justifyContent = 'space-between';
     headerDiv.style.alignItems = 'center';
     headerDiv.style.marginBottom = '20px';
     headerDiv.innerHTML = `
-        <h4 id="selectedStreetName" style="margin: 0;">${streetName}</h4>
-        <button onclick="backToStreetList()" class="buttonnumpad" style="padding: 5px 10px; width:auto; height:auto; font-size: 0.9em;">Zurück</button>
+        <button onclick="backToStreetList()" class="buttonnumpad" style="padding: 5px 10px; width:auto; height:auto; font-size: 0.9em; ">Zurück</button>
     `;
+    // <h4 id="selectedStreetName" style="text-align: center; flex-grow: 1;">${streetName}</h4>
     streetDetailContainer.appendChild(headerDiv);
 
     // Eingabeformular
@@ -553,7 +552,7 @@ function renderStreetDetailView(streetName) {
     const inputStyle = `padding: 10px; border: 1px solid var(--border-color, #ccc); border-radius: 5px; background-color: var(--input-bg, white); color: var(--text-color, black); box-sizing: border-box;`;
 
     formDiv.innerHTML = `
-        <h5>Neuer Eintrag / Bearbeiten</h5>
+        <h5>${streetName}</h5>
         <div style="display: flex; gap: 10px; margin-bottom: 12px;">
             <input type="text" id="houseNumberInput" placeholder="Hausnummer" required inputmode="numeric" style="flex-grow: 1; ${inputStyle}">
             <input type="text" id="nameInput" placeholder="Name" style="flex-grow: 1; ${inputStyle}">
