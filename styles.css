@@ -35,6 +35,75 @@ body {
     -webkit-tap-highlight-color: transparent; /* Klick-Highlight auf Touch entfernen */
 }
 
+/* --- Initial Loading Overlay --- */
+.initial-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.85); /* Halbtransparenter weißer Hintergrund */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; /* Sehr hoher z-index, um über allem zu liegen */
+    opacity: 1;
+    transition: opacity 0.3s ease-out; /* Sanftes Ausblenden */
+}
+
+.initial-loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none; /* Klicks durchlassen, wenn ausgeblendet */
+}
+
+.initial-loading-overlay .loading-spinner {
+    border: 5px solid var(--card-bg, #f3f3f3); /* Hellgrauer Rand */
+    border-top: 5px solid var(--primary-color, #2563eb); /* Blaue "Lade"-Farbe */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spinGlobal 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+.initial-loading-overlay p {
+    font-size: 1.1em;
+    color: var(--text-color, #1e293b);
+}
+
+/* Globale Spinner-Animation (falls nicht schon vorhanden) */
+@keyframes spinGlobal {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* NEU: Spinner für Ladeanzeigen in den Views */
+.loading-spinner-view {
+    border: 4px solid var(--card-bg, #f3f3f3); /* Etwas dünnerer Rand */
+    border-top: 4px solid var(--primary-color, #2563eb); /* Blaue "Lade"-Farbe */
+    border-radius: 50%;
+    width: 30px;  /* Kleinerer Spinner */
+    height: 30px;
+    animation: spinGlobal 0.8s linear infinite; /* Etwas schnellere Animation ggf. */
+    margin: 0 auto; /* Stellt sicher, dass er zentriert ist, wenn der Parent text-align:center hat */
+}
+
+/* Anpassung für #loadingIndicator, falls sein Parent kein Flex-Center ist */
+#loadingIndicator .loading-spinner-view {
+    /* margin: 0 auto; ist bereits oben, aber zur Verdeutlichung hier */
+}
+
+/* Anpassung für .loading-indicator-view, die bereits text-align: center haben */
+.loading-indicator-view {
+    display: flex; /* Um den Spinner perfekt zu zentrieren, wenn er das einzige Kind ist */
+    justify-content: center;
+    align-items: center;
+    /* text-align: center;  Beibehalten, falls doch Text hinzugefügt wird */
+    padding: 40px 20px; /* Beibehalten */
+    color: var(--text-color-muted, #6b7280); /* Farbe für eventuellen Text */
+}
+
 /* --- Login Container --- */
 .login-container {
     max-width: 400px;

@@ -14,6 +14,7 @@ let currentSortOrder = 'house_number_asc'; // NEU: Standard-Sortierreihenfolge
 // --- DOM Elemente ---
 const loginContainer = document.getElementById('loginContainer');
 const appContainer = document.getElementById('appContainer');
+const initialLoadingOverlay = document.getElementById('initialLoadingOverlay'); // NEU
 const plzInput = document.getElementById('plzInput');
 const streetListContainer = document.getElementById('streetListContainer');
 const streetDetailContainer = document.getElementById('streetDetailContainer');
@@ -106,28 +107,46 @@ const loginPasswordInput = document.getElementById('loginPassword'); // Passwort
         }
     });
 
-// --- Session & Auth ---
-        async function checkSession() {
-            const { data: { session }, error } = await supabaseClient.auth.getSession();
-            if (error) {
-                console.error('Error checking session:', error.message);
-        showLogin(); // Zeige Login bei Fehler
-                return;
+// --- NEUE Funktion zum Ausblenden des initialen Lade-Overlays ---
+function hideInitialLoadingOverlay() {
+    if (initialLoadingOverlay) {
+        initialLoadingOverlay.classList.add('hidden');
+        // Optional: Nach der Transition entfernen, um DOM sauber zu halten
+        setTimeout(() => {
+            if (initialLoadingOverlay.classList.contains('hidden')) { // Nur entfernen, wenn wirklich ausgeblendet
+                initialLoadingOverlay.style.display = 'none';
             }
-            if (session) {
-                currentUser = session.user;
+        }, 300); // Muss mit der CSS-Transition-Dauer übereinstimmen
+    }
+}
+
+// --- Session & Auth ---
+async function checkSession() {
+    // Das Overlay ist standardmäßig sichtbar durch HTML/CSS
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error) {
+        console.error('Error checking session:', error.message);
+        showLogin(); // Zeige Login bei Fehler
+        return;
+    }
+    if (session) {
+        currentUser = session.user;
         showApp();
     } else {
         showLogin();
     }
+    // Das Ausblenden des Overlays wird jetzt in showLogin() und showApp() gehandhabt
+    // direkt nach der Entscheidung, was angezeigt wird.
 }
 
-        supabaseClient.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN') {
-                currentUser = session.user;
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    // Das Overlay sollte hier bereits beim initialen Laden verarbeitet werden.
+    // onAuthStateChange ist eher für spätere Änderungen (Login/Logout).
+    if (event === 'SIGNED_IN') {
+        currentUser = session.user;
         showApp();
-            } else if (event === 'SIGNED_OUT') {
-                currentUser = null;
+    } else if (event === 'SIGNED_OUT') {
+        currentUser = null;
         showLogin();
     }
 });
@@ -135,20 +154,18 @@ const loginPasswordInput = document.getElementById('loginPassword'); // Passwort
 function showLogin() {
     loginContainer.style.display = 'block';
     appContainer.style.display = 'none';
-    // Reset App State
     resetAppState();
+    hideInitialLoadingOverlay(); // NEU: Overlay hier ausblenden
 }
 
 function showApp() {
     loginContainer.style.display = 'none';
     appContainer.style.display = 'flex';
-    getPostalCodeFromLocation(); // Versuche PLZ zu holen
-    // Standardansicht beim Laden der App anzeigen
-    switchView('mainView', 'SellX Solutions'); // Startet mit der Hauptansicht
-    updateGreetingPlaceholder(); // NEU: Platzhalter-Begrüßung aktualisieren
-    // === STELLT SICHER, DASS LISTENER HINZUGEFÜGT WERDEN ===
+    getPostalCodeFromLocation();
+    switchView('mainView', 'SellX Solutions');
+    updateGreetingPlaceholder();
     setupInputFocusListeners();
-    // === ENDE ===
+    hideInitialLoadingOverlay(); // NEU: Overlay hier ausblenden
 }
 
 function resetAppState() {
@@ -265,32 +282,31 @@ window.showLoginInterface = function() {
 // --- Standort & PLZ ---
 async function getPostalCodeFromLocation() {
     if (!navigator.geolocation) return;
-    // loadingIndicator.textContent = "Ermittle Standort..."; // Weniger aufdringlich
-    // loadingIndicator.style.display = 'block';
+    // loadingIndicator.textContent = "Ermittle Standort..."; // ENTFERNT
+    // loadingIndicator.style.display = 'block'; // Wird bei Bedarf später gesetzt
     navigator.geolocation.getCurrentPosition(
         async (position) => {
             const { latitude, longitude } = position.coords;
-            loadingIndicator.textContent = "Ermittle PLZ...";
-            loadingIndicator.style.display = 'block';
+            // loadingIndicator.textContent = "Ermittle PLZ..."; // ENTFERNT
+            loadingIndicator.style.display = 'block'; // Anzeige erst hier, falls wirklich geladen wird
             clearError();
             try {
                 const postalCode = await reverseGeocode(latitude, longitude);
                 if (postalCode) {
                     plzInput.value = postalCode;
-                    // Automatisches Drücken des Suchbuttons
-                    searchStreets(); // Sofortige Suche auslösen
+                    searchStreets();
                 }
             } catch (error) {
                 console.warn("Fehler beim Reverse Geocoding:", error);
             } finally {
                 loadingIndicator.style.display = 'none';
-                loadingIndicator.textContent = "Lade Straßen..."; // Zurücksetzen
+                // loadingIndicator.textContent = "Lade Straßen..."; // ENTFERNT
             }
         },
         (error) => {
             console.warn("Standortabfrage fehlgeschlagen:", error.message);
-            loadingIndicator.style.display = 'none'; // Sicherstellen, dass aus
-            loadingIndicator.textContent = "Lade Straßen...";
+            loadingIndicator.style.display = 'none';
+            // loadingIndicator.textContent = "Lade Straßen..."; // ENTFERNT
         },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     );
@@ -322,13 +338,11 @@ async function searchStreets() {
     }
 
     clearError();
-    // === PLATZHALTER AUSBLENDEN, LISTE LEEREN & AUSBLENDEN ===
     if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
-    streetListContainer.innerHTML = ''; // Leert die Liste UND entfernt den Platzhalter (temporär)
-    streetListContainer.style.display = 'none'; // Container ausblenden bis Ergebnisse da sind
-    // === ENDE ÄNDERUNG ===
+    streetListContainer.innerHTML = '';
+    streetListContainer.style.display = 'none';
     streetDetailContainer.style.display = 'none';
-    loadingIndicator.textContent = "Lade Straßen...";
+    // loadingIndicator.textContent = "Lade Straßen..."; // ENTFERNT
     loadingIndicator.style.display = 'block';
     searchStreetButton.disabled = true;
 
@@ -438,9 +452,9 @@ function displayStreets(streets, postalCode) {
 async function selectStreet(streetName, postalCode) {
     console.log(`Ausgewählte Straße: ${streetName}, PLZ: ${postalCode}`);
     clearError();
-    loadingIndicator.textContent = `Lade Daten für ${streetName}...`;
+    // loadingIndicator.textContent = `Lade Daten für ${streetName}...`; // ENTFERNT
     loadingIndicator.style.display = 'block';
-    streetListContainer.style.display = 'none'; // Straßenliste ausblenden
+    streetListContainer.style.display = 'none';
     if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
     
     currentSortOrder = 'house_number_asc'; // Standard-Sortierung für neu ausgewählte Straße setzen
@@ -736,10 +750,10 @@ async function saveOrUpdateHouseEntry() {
     if (saveButton) {
         saveButton.disabled = true;
         saveButton.textContent = 'Speichert...';
-        saveButton.classList.add('saving'); // Für Styling, falls gewünscht
+        saveButton.classList.add('saving'); 
     } else {
-        loadingIndicator.textContent = "Speichere Eintrag...";
-        loadingIndicator.style.display = 'block';
+        // loadingIndicator.textContent = "Speichere Eintrag..."; // ENTFERNT
+        loadingIndicator.style.display = 'block'; // Falls kein Button da, zeige globalen Spinner
     }
 
 
@@ -834,7 +848,7 @@ async function saveOrUpdateHouseEntry() {
             saveButton.classList.remove('saving');
         }
     } finally {
-        if (!saveButton) { // Nur wenn der globale Ladeindikator verwendet wurde
+        if (!saveButton) { 
             loadingIndicator.style.display = 'none';
         }
         // Stelle sicher, dass der Button im Fehlerfall (wenn nicht oben schon passiert)
@@ -872,7 +886,7 @@ async function deleteHouseEntry(entryId) {
     if (!confirm("Möchten Sie diesen Eintrag wirklich löschen?")) return;
 
     clearError();
-    loadingIndicator.textContent = "Lösche Eintrag...";
+    // loadingIndicator.textContent = "Lösche Eintrag..."; // ENTFERNT
     loadingIndicator.style.display = 'block';
 
     try {
@@ -1202,7 +1216,8 @@ async function loadStatsData() {
 
     statsContent.style.display = 'none';
     statsErrorDisplay.style.display = 'none';
-    statsLoadingIndicator.style.display = 'block';
+    // statsLoadingIndicator.textContent = "Lade Statistiken..."; // Wird nicht mehr benötigt, da Spinner im HTML
+    statsLoadingIndicator.style.display = 'flex'; // 'flex' wegen CSS Anpassung
 
     try {
         // Hole alle Einträge, die vom aktuellen Benutzer ERSTELLT wurden
@@ -1258,7 +1273,8 @@ async function loadLeaderboardData() {
 
     leaderboardContent.style.display = 'none';
     leaderboardErrorDisplay.style.display = 'none';
-    leaderboardLoadingIndicator.style.display = 'block';
+    // leaderboardLoadingIndicator.textContent = "Lade Leaderboard..."; // Wird nicht mehr benötigt
+    leaderboardLoadingIndicator.style.display = 'flex'; // 'flex' wegen CSS Anpassung
 
     try {
         // Rufe die neue oder angepasste RPC-Funktion auf
@@ -1293,8 +1309,9 @@ async function loadSettingsData() {
 
     settingsContent.style.display = 'none';
     settingsErrorDisplay.style.display = 'none';
-    settingsLoadingIndicator.style.display = 'block';
-    settingsStatus.textContent = ''; // Status zurücksetzen
+    // settingsLoadingIndicator.textContent = "Lade Einstellungen..."; // Wird nicht mehr benötigt
+    settingsLoadingIndicator.style.display = 'flex'; // 'flex' wegen CSS Anpassung
+    settingsStatus.textContent = ''; 
     settingsStatus.className = '';
 
     try {
@@ -1621,11 +1638,10 @@ function showSettingsMessage(message, isError = false) {
 
 // --- Initialisierung ---
 document.addEventListener('DOMContentLoaded', () => {
-    // === WICHTIG: Login Listener schon hier hinzufügen, da Login-Screen zuerst da ist ===
+    // Overlay ist initial sichtbar.
+    // Die checkSession-Funktion kümmert sich um das Ausblenden.
     setupLoginEnterListeners();
-    // === ENDE ÄNDERUNG ===
 
-    // Plugin-Registrierung (sicherstellen, dass ChartDataLabels definiert ist)
     if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
         console.log("ChartDataLabels Plugin registriert.");
@@ -1633,7 +1649,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Chart oder ChartDataLabels Plugin nicht gefunden. Stelle sicher, dass es korrekt eingebunden ist.');
     }
 
-    checkSession();
+    checkSession(); // Startet die Session-Prüfung
 });
 
 // === NEU: Separate Funktion für Login Listener ===
