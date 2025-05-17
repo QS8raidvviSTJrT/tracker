@@ -89,6 +89,8 @@ body {
     margin: 0 auto; /* Stellt sicher, dass er zentriert ist, wenn der Parent text-align:center hat */
 }
 
+.saved { background-color: var(--success-color) !important; color: white !important; border-color: var(--success-color) !important; }
+
 /* Anpassung für #loadingIndicator, falls sein Parent kein Flex-Center ist */
 #loadingIndicator .loading-spinner-view {
     /* margin: 0 auto; ist bereits oben, aber zur Verdeutlichung hier */

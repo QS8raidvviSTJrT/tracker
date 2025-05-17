@@ -78,63 +78,61 @@
                     </div>
                     <!-- Straßenliste wird hier dynamisch eingefügt -->
                 </div>
-                <div id="streetDetailContainer" class="street-detail-container" style="display: none;">
-                    <!-- Inhalt wird dynamisch von JS erzeugt -->
 
-                    <!-- Street Detail View Skeleton Loader -->
-                    <div class="skeleton-loader street-detail-skeleton" style="display: none;">
-                        <div class="skeleton-card" style="padding-top: 10px; padding-bottom: 10px; margin-bottom: 15px;">
-                            <div class="skeleton skeleton-button" style="width: 80px; height: 30px; margin-bottom: 0;"></div>
+                <!-- Street Detail View Skeleton Loader (als Geschwisterelement) -->
+                <div class="skeleton-loader street-detail-skeleton" style="display: none;">
+                    <div class="skeleton-card" style="padding-top: 10px; padding-bottom: 10px; margin-bottom: 15px;">
+                        <div class="skeleton skeleton-button" style="width: 80px; height: 30px; margin-bottom: 0;"></div>
+                    </div>
+                    <div class="skeleton-card" id="skeletonHouseEntryForm">
+                        <div class="skeleton skeleton-text medium" style="height: 1.2em; margin: 0 auto 15px auto; width: 60%;"></div> <!-- Street Name Placeholder -->
+                        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                            <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px;"></div>
+                            <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px;"></div>
                         </div>
-
-                        <div class="skeleton-card" id="skeletonHouseEntryForm">
-                            <div class="skeleton skeleton-text medium" style="height: 1.2em; margin: 0 auto 15px auto; width: 60%;"></div> <!-- Street Name Placeholder -->
-                            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-                                <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px;"></div>
-                                <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px;"></div>
-                            </div>
-                            <div class="skeleton skeleton-input" style="height: 40px; margin-bottom: 12px;"></div> <!-- Status Select -->
-                            <div class="skeleton skeleton-input" style="min-height: 70px; margin-bottom: 15px;"></div> <!-- Notes Textarea -->
-                            <div style="display: flex; gap: 10px;">
-                                <div class="skeleton skeleton-button" style="flex-grow: 1; height: 38px;"></div>
-                                <div class="skeleton skeleton-button" style="flex-grow: 1; height: 38px;"></div>
+                        <div class="skeleton skeleton-input" style="height: 40px; margin-bottom: 12px;"></div> <!-- Status Select -->
+                        <div class="skeleton skeleton-input" style="min-height: 70px; margin-bottom: 15px;"></div> <!-- Notes Textarea -->
+                        <div style="display: flex; gap: 10px;">
+                            <div class="skeleton skeleton-button" style="flex-grow: 1; height: 38px;"></div>
+                            <div class="skeleton skeleton-button" style="flex-grow: 1; height: 38px;"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card" id="skeletonSortControls" style="margin-top: 15px; margin-bottom: 15px; padding: 15px;">
+                         <div style="display: flex; align-items: center; gap: 10px;">
+                            <div class="skeleton skeleton-text short" style="height: 1em; width: 100px; margin-bottom:0;"></div>
+                            <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px; margin-bottom:0;"></div>
+                         </div>
+                    </div>
+                    <div class="skeleton-card" id="skeletonHouseEntriesList">
+                        <div class="skeleton-house-entry-item">
+                            <div class="skeleton skeleton-house-number-badge"></div>
+                            <div class="skeleton-house-entry-details">
+                                <div class="skeleton skeleton-text medium"></div>
+                                <div class="skeleton skeleton-text short"></div>
+                                <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
                             </div>
                         </div>
-
-                        <div class="skeleton-card" id="skeletonSortControls" style="margin-top: 15px; margin-bottom: 15px; padding: 15px;">
-                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <div class="skeleton skeleton-text short" style="height: 1em; width: 100px; margin-bottom:0;"></div>
-                                <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px; margin-bottom:0;"></div>
-                             </div>
+                         <div class="skeleton-house-entry-item">
+                            <div class="skeleton skeleton-house-number-badge"></div>
+                            <div class="skeleton-house-entry-details">
+                                <div class="skeleton skeleton-text medium"></div>
+                                <div class="skeleton skeleton-text short"></div>
+                                <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
+                            </div>
                         </div>
-
-                        <div class="skeleton-card" id="skeletonHouseEntriesList">
-                            <div class="skeleton-house-entry-item">
-                                <div class="skeleton skeleton-house-number-badge"></div>
-                                <div class="skeleton-house-entry-details">
-                                    <div class="skeleton skeleton-text medium"></div>
-                                    <div class="skeleton skeleton-text short"></div>
-                                    <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
-                                </div>
-                            </div>
-                             <div class="skeleton-house-entry-item">
-                                <div class="skeleton skeleton-house-number-badge"></div>
-                                <div class="skeleton-house-entry-details">
-                                    <div class="skeleton skeleton-text medium"></div>
-                                    <div class="skeleton skeleton-text short"></div>
-                                    <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
-                                </div>
-                            </div>
-                            <div class="skeleton-house-entry-item" style="border-bottom: none;">
-                                <div class="skeleton skeleton-house-number-badge"></div>
-                                <div class="skeleton-house-entry-details">
-                                    <div class="skeleton skeleton-text medium"></div>
-                                    <div class="skeleton skeleton-text short"></div>
-                                    <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
-                                </div>
+                        <div class="skeleton-house-entry-item" style="border-bottom: none;">
+                            <div class="skeleton skeleton-house-number-badge"></div>
+                            <div class="skeleton-house-entry-details">
+                                <div class="skeleton skeleton-text medium"></div>
+                                <div class="skeleton skeleton-text short"></div>
+                                <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div id="streetDetailContainer" class="street-detail-container" style="display: none;">
+                    <!-- Inhalt wird dynamisch von JS erzeugt -->
                 </div>
                 <div id="loadingIndicator" style="text-align: center; margin-top: 15px; display: none;">
                     <div class="loading-spinner-view"></div>

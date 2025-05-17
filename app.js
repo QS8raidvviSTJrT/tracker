@@ -236,11 +236,16 @@ function showApp() {
             mainV.style.display = 'flex';
             mainV.classList.add('active-view');
         }
-        if (currentViewTitleElement) currentViewTitleElement.textContent = activeDetail.streetName;
-        if (headerControls) headerControls.style.display = 'flex';
+        if (currentViewTitleElement) currentViewTitleElement.textContent = activeDetail.streetName; // Titel für die Straße setzen
+        if (headerControls) headerControls.style.display = 'flex'; // Header-Controls in der mainView anzeigen
 
         if (streetListContainer) streetListContainer.style.display = 'none';
         if (alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
+
+        // Sicherstellen, dass das Skeleton für die Detailansicht initial ausgeblendet ist,
+        // da selectStreet dessen Sichtbarkeit managt.
+        if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none';
+
 
         navItems.forEach(item => item.classList.remove('active'));
         // Der FAB ist standardmäßig für die mainView, braucht keine .active Klasse
@@ -579,15 +584,20 @@ function displayStreets(streets, postalCode) {
 async function selectStreet(streetName, postalCode) {
     console.log(`Ausgewählte Straße: ${streetName}, PLZ: ${postalCode}`);
     clearError();
-    // loadingIndicator.textContent = `Lade Daten für ${streetName}...`; // ENTFERNT
-    // loadingIndicator.style.display = 'block'; // ERSETZT durch Skeleton
-    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'block'; // Skeleton anzeigen
-    if (streetDetailContainer) streetDetailContainer.innerHTML = ''; // Alten Inhalt leeren, damit Skeleton nicht von Resten überdeckt wird
 
-    streetListContainer.style.display = 'none';
-    if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
+    // Echten Inhaltscontainer ausblenden und leeren
+    if (streetDetailContainer) {
+        streetDetailContainer.style.display = 'none';
+        streetDetailContainer.innerHTML = ''; 
+    }
+    // Skeleton anzeigen
+    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'block'; 
+
+    // Andere UI-Elemente anpassen
+    if (streetListContainer) streetListContainer.style.display = 'none';
+    if (alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
     
-    currentSortOrder = 'house_number_asc'; // Standard-Sortierung für neu ausgewählte Straße setzen
+    currentSortOrder = getFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY)?.sortOrder || 'house_number_asc'; // Sortierung ggf. aus Cache wiederherstellen
 
     try {
         // 1. Prüfen, ob Straße global existiert (ohne user_id Filter)
@@ -625,8 +635,10 @@ async function selectStreet(streetName, postalCode) {
 
         // 3. Zeige Detailansicht mit Hausnummern-Interface
         renderStreetDetailView(streetName); // Rendert den Inhalt in streetDetailContainer
-        if (streetDetailContainer) streetDetailContainer.style.display = 'block'; // Sicherstellen, dass Container sichtbar ist
-        if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; // Skeleton ausblenden nach dem Rendern
+        
+        // 4. Echten Inhalt anzeigen und Skeleton ausblenden
+        if (streetDetailContainer) streetDetailContainer.style.display = 'block'; 
+        if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; 
 
         // NEU: Aktive Detailansicht im localStorage speichern
         saveToLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY, {
@@ -642,7 +654,7 @@ async function selectStreet(streetName, postalCode) {
         if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; // Skeleton bei Fehler ausblenden
         backToStreetList(); // Im Fehlerfall zurück zur Liste
     } finally {
-        // loadingIndicator.style.display = 'none'; // Nicht mehr benötigt, da Skeleton verwendet wird
+        // loadingIndicator.style.display = 'none'; // Nicht mehr benötigt
     }
 }
 
@@ -967,7 +979,7 @@ async function saveOrUpdateHouseEntry() {
             saveButton.classList.remove('saving');
             saveButton.classList.add('saved'); // Diese CSS-Klasse sollte den Button grün färben.
                                              // Füge in deiner styles.css hinzu:
-                                             // .saved { background-color: var(--success-color) !important; color: white !important; border-color: var(--success-color) !important; }
+                                             
             setTimeout(() => {
                 saveButton.textContent = originalButtonText;
                 saveButton.disabled = false;
@@ -1072,39 +1084,40 @@ function clearHouseEntryForm() {
 
 
 function backToStreetList() {
-    streetDetailContainer.style.display = 'none';
-    streetDetailContainer.innerHTML = '';
-    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; // NEU: Skeleton hier auch ausblenden
-    removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY); // NEU: Cache für Detailansicht löschen
+    // Echten Detail-Inhalt und Skeleton ausblenden
+    if (streetDetailContainer) {
+        streetDetailContainer.style.display = 'none';
+        streetDetailContainer.innerHTML = '';
+    }
+    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none';
+    
+    removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY); 
 
-    currentAlphabetFilter = null; // Filter zurücksetzen
-    // Aktiven Button im Alphabet-Filter zurücksetzen
+    currentAlphabetFilter = null; 
     document.querySelectorAll('.alphabet-button').forEach(btn => btn.classList.remove('active'));
-    const allBtn = alphabetFilterContainer?.querySelector('.alphabet-button');
+    const allBtn = alphabetFilterContainer?.querySelector('.alphabet-button[data-letter="Alle"]'); // Spezifischer Selektor
     if(allBtn) allBtn.classList.add('active');
 
-    // Versuche, die gecachte Straßenliste für die aktuelle PLZ zu laden
     const cachedStreetData = getFromLocalStorage(LS_STREET_CACHE_KEY);
     const currentPlz = plzInput.value.trim();
 
     if (cachedStreetData && cachedStreetData.lastPlz === currentPlz && cachedStreetData.streets && cachedStreetData.streets.length > 0) {
         console.log("Restoring street list from cache for PLZ:", currentPlz);
         if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
-        streetListContainer.innerHTML = ''; // Sicherstellen, dass der Container leer ist
-        displayStreets(cachedStreetData.streets, currentPlz); // Zeigt die Liste und den Alphabet-Filter an
-        // streetListContainer.style.display = 'flex'; // Wird von displayStreets gehandhabt
+        if (streetListContainer) streetListContainer.innerHTML = ''; 
+        displayStreets(cachedStreetData.streets, currentPlz); 
     } else {
-        // Wenn keine passende gecachte Liste oder PLZ leer ist, zeige den Placeholder
-        streetListContainer.innerHTML = ''; // Leeren
+        if (streetListContainer) streetListContainer.innerHTML = ''; 
         if (streetListPlaceholder) {
-            streetListContainer.appendChild(streetListPlaceholder);
+            if (streetListContainer) streetListContainer.appendChild(streetListPlaceholder);
             streetListPlaceholder.style.display = 'flex';
         }
-        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; // Alphabet-Filter ausblenden
+        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; 
     }
     
-    // Container für die Straßenliste in jedem Fall anzeigen (entweder mit Liste oder Placeholder)
-    streetListContainer.style.display = 'flex';
+    if (streetListContainer) streetListContainer.style.display = 'flex';
+    if (currentViewTitleElement) currentViewTitleElement.textContent = 'SellX Solutions'; // Standardtitel wiederherstellen
+    if (headerControls) headerControls.style.display = 'flex'; // Header-Controls für Straßenliste anzeigen
 
 
     currentSelectedStreetId = null;
