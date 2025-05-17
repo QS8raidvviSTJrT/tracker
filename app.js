@@ -2,6 +2,37 @@ const supabaseUrl = 'https://pvjjtwuaofclmsvsaneo.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2amp0d3Vhb2ZjbG1zdnNhbmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4NzM2OTksImV4cCI6MjA2MjQ0OTY5OX0.yc4F3gKDGKMmws60u3KOYSM8t06rvDiJgOvEAuiYRa8'
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
+        // NEU: LocalStorage Keys
+        const LS_STREET_CACHE_KEY = 'doorTrackerStreetCache';
+        const LS_ACTIVE_STREET_DETAIL_KEY = 'doorTrackerActiveStreetDetail';
+
+        // NEU: LocalStorage Helper Functions
+        function saveToLocalStorage(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.warn("Error saving to localStorage", key, e);
+            }
+        }
+
+        function getFromLocalStorage(key) {
+            try {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : null;
+            } catch (e) {
+                console.warn("Error getting from localStorage", key, e);
+                return null;
+            }
+        }
+
+        function removeFromLocalStorage(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.warn("Error removing from localStorage", key, e);
+            }
+        }
+
         let deferredPrompt;
 let currentUser = null;
 let currentSelectedStreetId = null; // ID der aktuell ausgewählten Straße
@@ -21,6 +52,9 @@ const streetDetailContainer = document.getElementById('streetDetailContainer');
 const searchStreetButton = document.getElementById('searchStreetButton');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const errorDisplay = document.getElementById('errorDisplay');
+
+// NEU: Referenz für Header-Steuerelemente
+const headerControls = document.querySelector('.header-controls');
 
 // NEU: Referenzen für Views und Navigationsleiste
 const viewContainer = document.getElementById('viewContainer');
@@ -78,6 +112,13 @@ let workStartTime = null;
 // NEU: Referenzen für Login-Elemente
 const loginEmailInput = document.getElementById('loginEmail'); // E-Mail-Feld
 const loginPasswordInput = document.getElementById('loginPassword'); // Passwortfeld
+
+// NEU: Referenzen für Skeleton Loader
+const statsViewSkeleton = document.querySelector('.stats-view-skeleton');
+const leaderboardViewSkeleton = document.querySelector('.leaderboard-view-skeleton');
+const settingsViewSkeleton = document.querySelector('.settings-view-skeleton');
+const calendarViewSkeleton = document.querySelector('.calendar-view-skeleton');
+const streetDetailSkeleton = document.querySelector('.street-detail-skeleton'); // NEU
 
 // --- PWA Installationslogik ---
         function isIos() {
@@ -172,18 +213,61 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 function showLogin() {
     loginContainer.style.display = 'block';
     appContainer.style.display = 'none';
-    resetAppState();
+    resetAppState(); // Stellt sicher, dass Caches beim Logout geleert werden
     hideInitialLoadingOverlay(); // NEU: Overlay hier ausblenden
 }
 
 function showApp() {
     loginContainer.style.display = 'none';
     appContainer.style.display = 'flex';
-    getPostalCodeFromLocation();
-    switchView('mainView', 'SellX Solutions');
+    hideInitialLoadingOverlay();
+
+    const activeDetail = getFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY);
+
+    if (activeDetail && activeDetail.streetId && activeDetail.streetName && activeDetail.postalCode) {
+        console.log("Restoring active street detail from localStorage:", activeDetail);
+        plzInput.value = activeDetail.postalCode;
+        currentSortOrder = activeDetail.sortOrder || 'house_number_asc';
+
+        // mainView direkt vorbereiten, ohne switchView für mainView explizit zu rufen
+        views.forEach(view => view.style.display = 'none');
+        const mainV = document.getElementById('mainView');
+        if (mainV) {
+            mainV.style.display = 'flex';
+            mainV.classList.add('active-view');
+        }
+        if (currentViewTitleElement) currentViewTitleElement.textContent = activeDetail.streetName;
+        if (headerControls) headerControls.style.display = 'flex';
+
+        if (streetListContainer) streetListContainer.style.display = 'none';
+        if (alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
+
+        navItems.forEach(item => item.classList.remove('active'));
+        // Der FAB ist standardmäßig für die mainView, braucht keine .active Klasse
+
+        // selectStreet lädt die Daten und rendert die Detailansicht
+        selectStreet(activeDetail.streetName, activeDetail.postalCode);
+
+    } else {
+        // Keine Detailansicht, Standard MainView-Logik
+        const cachedStreetData = getFromLocalStorage(LS_STREET_CACHE_KEY);
+        if (cachedStreetData && cachedStreetData.lastPlz) {
+            plzInput.value = cachedStreetData.lastPlz;
+            // searchStreets() wird nun den Cache für Straßen prüfen oder API callen
+            searchStreets();
+        } else {
+            // Wenn keine letzte PLZ im Cache, versuche Standort
+            getPostalCodeFromLocation();
+        }
+        // Setze die mainView als aktiv und den Standardtitel, falls nicht schon durch Detailansicht geschehen
+        // Dies ist wichtig, falls weder Detail noch Straßenliste gecached waren.
+        if (!activeDetail) { // Nur wenn keine Detailansicht wiederhergestellt wurde
+             switchView('mainView', 'SellX Solutions');
+        }
+    }
+
     updateGreetingPlaceholder();
     setupInputFocusListeners();
-    hideInitialLoadingOverlay(); // NEU: Overlay hier ausblenden
 }
 
 function resetAppState() {
@@ -206,6 +290,10 @@ function resetAppState() {
     clearError();
     // Ladeanzeige ausblenden
     loadingIndicator.style.display = 'none';
+
+    // NEU: Caches leeren
+    removeFromLocalStorage(LS_STREET_CACHE_KEY);
+    removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY);
 }
 
 
@@ -356,12 +444,29 @@ async function searchStreets() {
     }
 
     clearError();
+    // Wichtig: Wenn eine neue Suche gestartet wird, ist eine eventuell offene Detailansicht nicht mehr relevant.
+    removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY);
+    if (streetDetailContainer) streetDetailContainer.style.display = 'none';
+    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none';
+    if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; // Alphabet Filter auch ausblenden
+
+    // Prüfen, ob Straßen für diese PLZ im Cache sind
+    const cachedData = getFromLocalStorage(LS_STREET_CACHE_KEY);
+    if (cachedData && cachedData.lastPlz === plz && cachedData.streets) {
+        console.log("Loading streets from localStorage for PLZ:", plz);
+        if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
+        streetListContainer.innerHTML = ''; // Leeren für neue Liste
+        displayStreets(cachedData.streets, plz); // Straßen aus Cache anzeigen
+        streetListContainer.style.display = 'flex'; // Sicherstellen, dass Container sichtbar ist
+        return; // Frühzeitiger Ausstieg
+    }
+
+    // Wenn nicht im Cache, dann API-Call vorbereiten
     if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
     streetListContainer.innerHTML = '';
-    streetListContainer.style.display = 'none';
-    streetDetailContainer.style.display = 'none';
-    // loadingIndicator.textContent = "Lade Straßen..."; // ENTFERNT
-    loadingIndicator.style.display = 'block';
+    streetListContainer.style.display = 'none'; // Vorerst ausblenden, bis Daten da sind
+    
+    loadingIndicator.style.display = 'block'; // Original Spinner für Straßenliste anzeigen
     searchStreetButton.disabled = true;
 
     const overpassUrl = 'https://overpass-api.de/api/interpreter';
@@ -391,6 +496,8 @@ async function searchStreets() {
 
         // displayStreets macht die Liste (ohne Platzhalter) wieder sichtbar
         displayStreets(streets, plz);
+        // NEU: Straßen im localStorage speichern
+        saveToLocalStorage(LS_STREET_CACHE_KEY, { lastPlz: plz, streets: streets, timestamp: Date.now() });
 
     } catch (error) {
         console.error('Fehler beim Abrufen der Straßen:', error);
@@ -400,6 +507,8 @@ async function searchStreets() {
         }
         // === PLATZHALTER BLEIBT AUSGEBLENDET, DA FEHLER ANGEZEIGT WIRD ===
         streetListContainer.style.display = 'none'; // Liste bleibt bei Fehler aus
+        // Optional: Cache für diese PLZ bei Fehler entfernen oder als fehlerhaft markieren
+        // removeFromLocalStorage(LS_STREET_CACHE_KEY);
     } finally {
         loadingIndicator.style.display = 'none';
         searchStreetButton.disabled = false;
@@ -471,7 +580,10 @@ async function selectStreet(streetName, postalCode) {
     console.log(`Ausgewählte Straße: ${streetName}, PLZ: ${postalCode}`);
     clearError();
     // loadingIndicator.textContent = `Lade Daten für ${streetName}...`; // ENTFERNT
-    loadingIndicator.style.display = 'block';
+    // loadingIndicator.style.display = 'block'; // ERSETZT durch Skeleton
+    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'block'; // Skeleton anzeigen
+    if (streetDetailContainer) streetDetailContainer.innerHTML = ''; // Alten Inhalt leeren, damit Skeleton nicht von Resten überdeckt wird
+
     streetListContainer.style.display = 'none';
     if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
     
@@ -512,14 +624,25 @@ async function selectStreet(streetName, postalCode) {
         await loadHouseEntries(currentSelectedStreetId);
 
         // 3. Zeige Detailansicht mit Hausnummern-Interface
-        renderStreetDetailView(streetName);
+        renderStreetDetailView(streetName); // Rendert den Inhalt in streetDetailContainer
+        if (streetDetailContainer) streetDetailContainer.style.display = 'block'; // Sicherstellen, dass Container sichtbar ist
+        if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; // Skeleton ausblenden nach dem Rendern
+
+        // NEU: Aktive Detailansicht im localStorage speichern
+        saveToLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY, {
+            streetId: currentSelectedStreetId,
+            streetName: streetName,
+            postalCode: postalCode,
+            sortOrder: currentSortOrder // Aktuelle Sortierung mitspeichern
+        });
 
     } catch (error) {
         console.error('Fehler beim Auswählen/Anlegen der Straße oder Laden der Einträge:', error);
         showError(`Ein Fehler ist aufgetreten: ${error.message}`);
+        if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; // Skeleton bei Fehler ausblenden
         backToStreetList(); // Im Fehlerfall zurück zur Liste
     } finally {
-        loadingIndicator.style.display = 'none';
+        // loadingIndicator.style.display = 'none'; // Nicht mehr benötigt, da Skeleton verwendet wird
     }
 }
 
@@ -951,39 +1074,44 @@ function clearHouseEntryForm() {
 function backToStreetList() {
     streetDetailContainer.style.display = 'none';
     streetDetailContainer.innerHTML = '';
+    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; // NEU: Skeleton hier auch ausblenden
+    removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY); // NEU: Cache für Detailansicht löschen
 
-    // Filter ausblenden und Zustand zurücksetzen (bereits vorhanden)
-    // if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; // Wird jetzt unten gesteuert
-    currentAlphabetFilter = null;
+    currentAlphabetFilter = null; // Filter zurücksetzen
+    // Aktiven Button im Alphabet-Filter zurücksetzen
+    document.querySelectorAll('.alphabet-button').forEach(btn => btn.classList.remove('active'));
+    const allBtn = alphabetFilterContainer?.querySelector('.alphabet-button');
+    if(allBtn) allBtn.classList.add('active');
 
-    // Platzhalter oder Liste wieder anzeigen
-    const hasStreetItems = streetListContainer.querySelector('.street-item');
-    if (!hasStreetItems && streetListPlaceholder) {
-        // Platzhalter anzeigen
-         streetListContainer.innerHTML = '';
-         streetListContainer.appendChild(streetListPlaceholder);
-         streetListPlaceholder.style.display = 'flex';
-         // Filter bleibt aus
-         if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
-    } else if (hasStreetItems) {
-        // Liste anzeigen
-        streetListContainer.querySelectorAll('.street-item').forEach(item => item.style.display = 'block');
-        // === NEU: Alphabet-Filter WIEDER anzeigen, wenn Liste angezeigt wird ===
-        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'flex';
-        // === ENDE NEU ===
-        // Aktiven Button im Alphabet-Filter zurücksetzen
-        document.querySelectorAll('.alphabet-button').forEach(btn => btn.classList.remove('active'));
-        const allBtn = alphabetFilterContainer?.querySelector('.alphabet-button');
-        if(allBtn) allBtn.classList.add('active');
+    // Versuche, die gecachte Straßenliste für die aktuelle PLZ zu laden
+    const cachedStreetData = getFromLocalStorage(LS_STREET_CACHE_KEY);
+    const currentPlz = plzInput.value.trim();
+
+    if (cachedStreetData && cachedStreetData.lastPlz === currentPlz && cachedStreetData.streets && cachedStreetData.streets.length > 0) {
+        console.log("Restoring street list from cache for PLZ:", currentPlz);
+        if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
+        streetListContainer.innerHTML = ''; // Sicherstellen, dass der Container leer ist
+        displayStreets(cachedStreetData.streets, currentPlz); // Zeigt die Liste und den Alphabet-Filter an
+        // streetListContainer.style.display = 'flex'; // Wird von displayStreets gehandhabt
+    } else {
+        // Wenn keine passende gecachte Liste oder PLZ leer ist, zeige den Placeholder
+        streetListContainer.innerHTML = ''; // Leeren
+        if (streetListPlaceholder) {
+            streetListContainer.appendChild(streetListPlaceholder);
+            streetListPlaceholder.style.display = 'flex';
+        }
+        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; // Alphabet-Filter ausblenden
     }
-    // Container anzeigen
+    
+    // Container für die Straßenliste in jedem Fall anzeigen (entweder mit Liste oder Placeholder)
     streetListContainer.style.display = 'flex';
+
 
     currentSelectedStreetId = null;
     currentHouseEntries = [];
     currentEditingEntryId = null;
     clearError();
-    // plzInput.focus(); // ENTFERNE ODER KOMMENTIERE DIESE ZEILE AUS
+    // plzInput.focus(); // Fokus nicht automatisch setzen
 }
 
 // --- NEU: View Switching Logik ---
@@ -998,6 +1126,13 @@ window.switchView = function(viewIdToShow, viewTitle) {
         view.style.display = 'none'; // Explizit ausblenden
         view.classList.remove('active-view'); // Auch Klasse entfernen
     });
+
+    // NEU: Alle Skeletons initial ausblenden, um den Zustand zurückzusetzen
+    if (statsViewSkeleton) statsViewSkeleton.classList.add('hidden');
+    if (leaderboardViewSkeleton) leaderboardViewSkeleton.classList.add('hidden');
+    if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden');
+    if (calendarViewSkeleton) calendarViewSkeleton.classList.add('hidden');
+
 
     // 2. Die ausgewählte View anzeigen (explizit über style.display)
     const viewToShow = document.getElementById(viewIdToShow);
@@ -1030,23 +1165,41 @@ window.switchView = function(viewIdToShow, viewTitle) {
         currentViewTitleElement.textContent = viewTitle || 'Door Tracker';
     }
 
-    // 5. Optional: Daten für die neue Ansicht laden (unverändert)
+    // NEU: Sichtbarkeit der Header-Controls steuern
+    if (headerControls) {
+        if (viewIdToShow === 'mainView') {
+            headerControls.style.display = 'flex'; // Oder 'block', je nach ursprünglichem Display-Typ
+        } else {
+            headerControls.style.display = 'none';
+        }
+    }
+
+    // 5. Optional: Daten für die neue Ansicht laden UND SKELETON ANZEIGEN
     switch (viewIdToShow) {
         case 'statsView':
             console.log("[switchView] Lade Daten für Statistik");
-            loadStatsData(); // Statistikdaten laden
+            if (statsViewSkeleton) statsViewSkeleton.classList.remove('hidden');
+            if (statsContent) statsContent.style.display = 'none';
+            loadStatsData();
             break;
         case 'leaderboardView':
              console.log("[switchView] Lade Daten für Leaderboard");
-             loadLeaderboardData(); // Leaderboard laden
+             if (leaderboardViewSkeleton) leaderboardViewSkeleton.classList.remove('hidden');
+             if (leaderboardContent) leaderboardContent.style.display = 'none';
+             loadLeaderboardData();
             break;
         case 'settingsView':
              console.log("[switchView] Lade Daten für Einstellungen");
-             loadSettingsData(); // Einstellungen laden
+             if (settingsViewSkeleton) settingsViewSkeleton.classList.remove('hidden');
+             if (settingsContent) settingsContent.style.display = 'none';
+             loadSettingsData();
             break;
         case 'calendarView': // NEUER CASE
             console.log("[switchView] Lade Daten für Kalender");
-            loadCalendarData(); // Kalenderdaten laden (Platzhalterfunktion)
+            if (calendarViewSkeleton) calendarViewSkeleton.classList.remove('hidden');
+            if (timeTrackingControls) timeTrackingControls.style.display = 'none';
+            if (timeTrackingHistory) timeTrackingHistory.style.display = 'none';
+            loadCalendarData();
             break;
         case 'mainView':
              console.log("[switchView] Aktiviere Hauptansicht");
@@ -1235,10 +1388,9 @@ function updateGreetingPlaceholder() {
 async function loadStatsData() {
     if (!currentUser) return;
 
-    statsContent.style.display = 'none';
-    statsErrorDisplay.style.display = 'none';
-    // statsLoadingIndicator.textContent = "Lade Statistiken..."; // Wird nicht mehr benötigt, da Spinner im HTML
-    statsLoadingIndicator.style.display = 'flex'; // 'flex' wegen CSS Anpassung
+    // Skeleton wird von switchView angezeigt. Inhalt wird von switchView ausgeblendet.
+    if (statsErrorDisplay) statsErrorDisplay.style.display = 'none';
+    // if (statsLoadingIndicator) statsLoadingIndicator.style.display = 'flex'; // ENTFERNT: Spinner nicht mehr anzeigen
 
     try {
         // Hole alle Einträge, die vom aktuellen Benutzer ERSTELLT wurden
@@ -1278,24 +1430,28 @@ async function loadStatsData() {
         displayStatsData(totalEntries, statusCounts);
         renderStatusChart(statusCounts);
 
-        statsContent.style.display = 'block';
+        if (statsContent) statsContent.style.display = 'block'; // Inhalt anzeigen
+        if (statsViewSkeleton) statsViewSkeleton.classList.add('hidden'); // Skeleton ausblenden
 
     } catch (error) {
         console.error("Fehler beim Laden der Statistiken:", error);
-        statsErrorDisplay.textContent = `Fehler beim Laden der Statistiken: ${error.message}`;
-        statsErrorDisplay.style.display = 'block';
+        if (statsErrorDisplay) {
+            statsErrorDisplay.textContent = `Fehler beim Laden der Statistiken: ${error.message}`;
+            statsErrorDisplay.style.display = 'block';
+        }
+        if (statsViewSkeleton) statsViewSkeleton.classList.add('hidden'); // Skeleton bei Fehler ausblenden
+        if (statsContent) statsContent.style.display = 'none'; // Sicherstellen, dass Inhalt ausgeblendet bleibt
     } finally {
-        statsLoadingIndicator.style.display = 'none';
+        // if (statsLoadingIndicator) statsLoadingIndicator.style.display = 'none'; // ENTFERNT
     }
 }
 
 async function loadLeaderboardData() {
     if (!currentUser) return;
 
-    leaderboardContent.style.display = 'none';
-    leaderboardErrorDisplay.style.display = 'none';
-    // leaderboardLoadingIndicator.textContent = "Lade Leaderboard..."; // Wird nicht mehr benötigt
-    leaderboardLoadingIndicator.style.display = 'flex'; // 'flex' wegen CSS Anpassung
+    // Skeleton wird von switchView angezeigt. Inhalt wird von switchView ausgeblendet.
+    if (leaderboardErrorDisplay) leaderboardErrorDisplay.style.display = 'none';
+    // if (leaderboardLoadingIndicator) leaderboardLoadingIndicator.style.display = 'flex'; // ENTFERNT
 
     try {
         // Rufe die neue oder angepasste RPC-Funktion auf
@@ -1314,26 +1470,30 @@ async function loadLeaderboardData() {
         }
 
         displayLeaderboardData(leaderboardEntries);
-        leaderboardContent.style.display = 'block';
+        if (leaderboardContent) leaderboardContent.style.display = 'block'; // Inhalt anzeigen
+        if (leaderboardViewSkeleton) leaderboardViewSkeleton.classList.add('hidden'); // Skeleton ausblenden
 
     } catch (error) {
         console.error("Fehler beim Laden des Leaderboards:", error);
-        leaderboardErrorDisplay.textContent = `${error.message}`;
-        leaderboardErrorDisplay.style.display = 'block';
+        if (leaderboardErrorDisplay) {
+            leaderboardErrorDisplay.textContent = `${error.message}`;
+            leaderboardErrorDisplay.style.display = 'block';
+        }
+        if (leaderboardViewSkeleton) leaderboardViewSkeleton.classList.add('hidden'); // Skeleton bei Fehler ausblenden
+        if (leaderboardContent) leaderboardContent.style.display = 'none'; // Sicherstellen, dass Inhalt ausgeblendet bleibt
     } finally {
-        leaderboardLoadingIndicator.style.display = 'none';
+        // if (leaderboardLoadingIndicator) leaderboardLoadingIndicator.style.display = 'none'; // ENTFERNT
     }
 }
 
 async function loadSettingsData() {
     if (!currentUser) return;
 
-    settingsContent.style.display = 'none';
-    settingsErrorDisplay.style.display = 'none';
-    // settingsLoadingIndicator.textContent = "Lade Einstellungen..."; // Wird nicht mehr benötigt
-    settingsLoadingIndicator.style.display = 'flex'; // 'flex' wegen CSS Anpassung
-    settingsStatus.textContent = ''; 
-    settingsStatus.className = '';
+    // Skeleton wird von switchView angezeigt. Inhalt wird von switchView ausgeblendet.
+    if (settingsErrorDisplay) settingsErrorDisplay.style.display = 'none';
+    // if (settingsLoadingIndicator) settingsLoadingIndicator.style.display = 'flex'; // ENTFERNT
+    if (settingsStatus) settingsStatus.textContent = '';
+    if (settingsStatus) settingsStatus.className = '';
 
     try {
         // Hole aktuelle Benutzerdaten, inklusive Metadaten
@@ -1346,16 +1506,21 @@ async function loadSettingsData() {
 
         // Setze den aktuellen Anzeigenamen ins Feld
         const currentDisplayName = user.user_metadata?.display_name || '';
-        displayNameInput.value = currentDisplayName;
+        if (displayNameInput) displayNameInput.value = currentDisplayName;
 
-        settingsContent.style.display = 'block';
+        if (settingsContent) settingsContent.style.display = 'block'; // Inhalt anzeigen
+        if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden'); // Skeleton ausblenden
 
     } catch (error) {
         console.error("Fehler beim Laden der Einstellungen:", error);
-        settingsErrorDisplay.textContent = `Fehler beim Laden der Einstellungen: ${error.message}`;
-        settingsErrorDisplay.style.display = 'block';
+        if (settingsErrorDisplay) {
+            settingsErrorDisplay.textContent = `Fehler beim Laden der Einstellungen: ${error.message}`;
+            settingsErrorDisplay.style.display = 'block';
+        }
+        if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden'); // Skeleton bei Fehler ausblenden
+        if (settingsContent) settingsContent.style.display = 'none'; // Sicherstellen, dass Inhalt ausgeblendet bleibt
     } finally {
-        settingsLoadingIndicator.style.display = 'none';
+        // if (settingsLoadingIndicator) settingsLoadingIndicator.style.display = 'none'; // ENTFERNT
     }
 }
 
@@ -1710,10 +1875,11 @@ async function loadCalendarData() {
     // DOM Elemente initialisieren (einmalig oder bei Bedarf neu)
     initializeCalendarViewDOMElements();
 
-
+    // Skeleton wird von switchView angezeigt. Inhalt (timeTrackingControls, timeTrackingHistory) wird von switchView ausgeblendet.
     if (calendarErrorDisplay) calendarErrorDisplay.style.display = 'none';
-    if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'flex';
-    if (currentStatusText) currentStatusText.textContent = "Lädt...";
+    // if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'flex'; // ENTFERNT
+    // currentStatusText wird durch Skeleton-Feedback ersetzt oder später gesetzt
+    // if (currentStatusText) currentStatusText.textContent = "Lädt...";
 
 
     try {
@@ -1729,15 +1895,23 @@ async function loadCalendarData() {
         await checkActiveWorkEntry(); // Prüfen, ob ein Eintrag aktiv ist
         await loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date()));
 
+        // Inhalt anzeigen
+        if (timeTrackingControls) timeTrackingControls.style.display = 'block'; // Oder 'flex', falls es ein Flex-Container ist
+        if (timeTrackingHistory) timeTrackingHistory.style.display = 'block';
+        if (calendarViewSkeleton) calendarViewSkeleton.classList.add('hidden'); // Skeleton ausblenden
+
     } catch (error) {
         console.error("Fehler beim Laden der Kalenderdaten:", error);
         if (calendarErrorDisplay) {
             calendarErrorDisplay.textContent = `Fehler beim Laden der Kalenderdaten: ${error.message}`;
             calendarErrorDisplay.style.display = 'block';
         }
-        if (currentStatusText) currentStatusText.textContent = "Fehler";
+        if (calendarViewSkeleton) calendarViewSkeleton.classList.add('hidden'); // Skeleton bei Fehler ausblenden
+        // Sicherstellen, dass Inhalt ausgeblendet bleibt
+        if (timeTrackingControls) timeTrackingControls.style.display = 'none';
+        if (timeTrackingHistory) timeTrackingHistory.style.display = 'none';
     } finally {
-        if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'none';
+        // if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'none'; // ENTFERNT
     }
 }
 
@@ -2003,7 +2177,6 @@ async function loadDailySummaryAndEntries(dateString) {
                 li.innerHTML = `
                     <div class="time-entry-details">
                         <strong>${startTimeFormatted} - ${endTimeFormatted}</strong>
-                        <span>${notesDisplay}</span>
                     </div>
                     <div class="time-entry-duration">Dauer: ${durationFormatted}</div>
                 `;

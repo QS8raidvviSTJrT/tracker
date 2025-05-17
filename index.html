@@ -80,6 +80,61 @@
                 </div>
                 <div id="streetDetailContainer" class="street-detail-container" style="display: none;">
                     <!-- Inhalt wird dynamisch von JS erzeugt -->
+
+                    <!-- Street Detail View Skeleton Loader -->
+                    <div class="skeleton-loader street-detail-skeleton" style="display: none;">
+                        <div class="skeleton-card" style="padding-top: 10px; padding-bottom: 10px; margin-bottom: 15px;">
+                            <div class="skeleton skeleton-button" style="width: 80px; height: 30px; margin-bottom: 0;"></div>
+                        </div>
+
+                        <div class="skeleton-card" id="skeletonHouseEntryForm">
+                            <div class="skeleton skeleton-text medium" style="height: 1.2em; margin: 0 auto 15px auto; width: 60%;"></div> <!-- Street Name Placeholder -->
+                            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                                <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px;"></div>
+                                <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px;"></div>
+                            </div>
+                            <div class="skeleton skeleton-input" style="height: 40px; margin-bottom: 12px;"></div> <!-- Status Select -->
+                            <div class="skeleton skeleton-input" style="min-height: 70px; margin-bottom: 15px;"></div> <!-- Notes Textarea -->
+                            <div style="display: flex; gap: 10px;">
+                                <div class="skeleton skeleton-button" style="flex-grow: 1; height: 38px;"></div>
+                                <div class="skeleton skeleton-button" style="flex-grow: 1; height: 38px;"></div>
+                            </div>
+                        </div>
+
+                        <div class="skeleton-card" id="skeletonSortControls" style="margin-top: 15px; margin-bottom: 15px; padding: 15px;">
+                             <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="skeleton skeleton-text short" style="height: 1em; width: 100px; margin-bottom:0;"></div>
+                                <div class="skeleton skeleton-input" style="flex-grow: 1; height: 40px; margin-bottom:0;"></div>
+                             </div>
+                        </div>
+
+                        <div class="skeleton-card" id="skeletonHouseEntriesList">
+                            <div class="skeleton-house-entry-item">
+                                <div class="skeleton skeleton-house-number-badge"></div>
+                                <div class="skeleton-house-entry-details">
+                                    <div class="skeleton skeleton-text medium"></div>
+                                    <div class="skeleton skeleton-text short"></div>
+                                    <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
+                                </div>
+                            </div>
+                             <div class="skeleton-house-entry-item">
+                                <div class="skeleton skeleton-house-number-badge"></div>
+                                <div class="skeleton-house-entry-details">
+                                    <div class="skeleton skeleton-text medium"></div>
+                                    <div class="skeleton skeleton-text short"></div>
+                                    <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
+                                </div>
+                            </div>
+                            <div class="skeleton-house-entry-item" style="border-bottom: none;">
+                                <div class="skeleton skeleton-house-number-badge"></div>
+                                <div class="skeleton-house-entry-details">
+                                    <div class="skeleton skeleton-text medium"></div>
+                                    <div class="skeleton skeleton-text short"></div>
+                                    <div class="skeleton skeleton-text long" style="height: 2.5em;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="loadingIndicator" style="text-align: center; margin-top: 15px; display: none;">
                     <div class="loading-spinner-view"></div>
@@ -92,6 +147,25 @@
                     <div class="loading-spinner-view"></div>
                 </div>
                 <div id="statsErrorDisplay" class="error-display-view" style="display: none;"></div>
+
+                <!-- Stats View Skeleton Loader -->
+                <div class="skeleton-loader stats-view-skeleton">
+                    <div class="content-card skeleton-card">
+                        <div class="skeleton skeleton-title" style="width: 60%; margin-bottom: 20px;"></div>
+                        <div class="stats-grid-skeleton">
+                            <div class="skeleton skeleton-stat-item"></div>
+                            <div class="skeleton skeleton-stat-item"></div>
+                            <div class="skeleton skeleton-stat-item"></div>
+                            <div class="skeleton skeleton-stat-item"></div>
+                            <div class="skeleton skeleton-stat-item"></div>
+                        </div>
+                    </div>
+                    <div class="content-card skeleton-card">
+                        <div class="skeleton skeleton-title" style="width: 70%; margin-bottom: 20px;"></div>
+                        <div class="skeleton skeleton-chart-container"></div>
+                    </div>
+                </div>
+
                 <div id="statsContent" style="display: none;">
                     <div class="content-card">
                         <h2>Deine Statistik</h2>
@@ -132,6 +206,41 @@
                     <div class="loading-spinner-view"></div>
                 </div>
                 <div id="leaderboardErrorDisplay" class="error-display-view" style="display: none;"></div>
+
+                <!-- Leaderboard View Skeleton Loader -->
+                <div class="skeleton-loader leaderboard-view-skeleton">
+                    <div class="content-card skeleton-card">
+                        <div class="skeleton skeleton-title" style="width: 50%; margin-bottom: 20px;"></div>
+                        <div class="skeleton-table-skeleton">
+                            <div class="skeleton-table-row">
+                                <div class="skeleton skeleton-rank"></div>
+                                <div class="skeleton skeleton-name"></div>
+                                <div class="skeleton skeleton-score"></div>
+                            </div>
+                            <div class="skeleton-table-row">
+                                <div class="skeleton skeleton-rank"></div>
+                                <div class="skeleton skeleton-name"></div>
+                                <div class="skeleton skeleton-score"></div>
+                            </div>
+                            <div class="skeleton-table-row">
+                                <div class="skeleton skeleton-rank"></div>
+                                <div class="skeleton skeleton-name"></div>
+                                <div class="skeleton skeleton-score"></div>
+                            </div>
+                            <div class="skeleton-table-row">
+                                <div class="skeleton skeleton-rank"></div>
+                                <div class="skeleton skeleton-name"></div>
+                                <div class="skeleton skeleton-score"></div>
+                            </div>
+                            <div class="skeleton-table-row" style="border-bottom: none;">
+                                <div class="skeleton skeleton-rank"></div>
+                                <div class="skeleton skeleton-name"></div>
+                                <div class="skeleton skeleton-score"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="leaderboardContent" style="display: none;">
                     <div class="content-card">
                         <h2>Leaderboard</h2>
@@ -158,6 +267,19 @@
                     <div class="loading-spinner-view"></div>
                 </div>
                 <div id="settingsErrorDisplay" class="error-display-view" style="display: none;"></div>
+
+                <!-- Settings View Skeleton Loader -->
+                <div class="skeleton-loader settings-view-skeleton">
+                    <div class="content-card skeleton-card">
+                        <div class="skeleton skeleton-title" style="width: 50%; margin-bottom: 25px;"></div>
+                        <div class="skeleton skeleton-label" style="width: 60%;"></div>
+                        <div class="skeleton skeleton-input"></div>
+                        <div class="skeleton skeleton-settings-button"></div>
+                        <hr style="margin: 25px 0; border: none; border-top: 1px solid var(--card-border);">
+                        <div class="skeleton skeleton-logout-button"></div>
+                    </div>
+                </div>
+
                 <div id="settingsContent" style="display: none;">
                     <div class="content-card">
                         <h2>Einstellungen</h2>
@@ -176,6 +298,45 @@
             </div>
 
             <div id="calendarView" class="view">
+
+                <!-- Calendar View Skeleton Loader -->
+                <div class="skeleton-loader calendar-view-skeleton">
+                    <div class="content-card skeleton-card">
+                        <div class="skeleton skeleton-title" style="width: 70%; margin-bottom: 20px;"></div>
+                        <div class="skeleton-status-item">
+                            <div class="skeleton skeleton-text short skeleton-status-label"></div>
+                            <div class="skeleton skeleton-text medium skeleton-status-value"></div>
+                        </div>
+                        <div class="skeleton-status-item">
+                            <div class="skeleton skeleton-text short skeleton-status-label"></div>
+                            <div class="skeleton skeleton-text medium skeleton-status-value"></div>
+                        </div>
+                        <div class="skeleton-status-item" style="margin-bottom: 0;">
+                            <div class="skeleton skeleton-text short skeleton-status-label"></div>
+                            <div class="skeleton skeleton-text medium skeleton-status-value"></div>
+                        </div>
+                        <div class="skeleton-time-buttons">
+                            <div class="skeleton skeleton-time-button"></div>
+                            <div class="skeleton skeleton-time-button"></div>
+                        </div>
+                    </div>
+                    <div class="content-card skeleton-card">
+                        <div class="skeleton-history-header">
+                            <div class="skeleton skeleton-history-title"></div>
+                            <div class="skeleton skeleton-date-input"></div>
+                        </div>
+                        <div style="margin-bottom: 15px;"> <!-- Wrapper for summary -->
+                            <div class="skeleton-summary-item">
+                                <div class="skeleton skeleton-text short skeleton-summary-label"></div>
+                                <div class="skeleton skeleton-text short skeleton-summary-value"></div>
+                            </div>
+                        </div>
+                        <div class="skeleton skeleton-time-entry"></div>
+                        <div class="skeleton skeleton-time-entry"></div>
+                        <div class="skeleton skeleton-time-entry" style="margin-bottom: 0;"></div>
+                    </div>
+                </div>
+
                 <div id="timeTrackingControls" class="content-card">
                     <h2>Arbeitszeiterfassung</h2>
                     <div id="timeTrackingStatusDisplay" class="time-tracking-status-display">
