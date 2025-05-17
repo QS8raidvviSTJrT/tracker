@@ -29,7 +29,7 @@ body {
     background-color: var(--bg-color); /* Weißer Hintergrund */
     min-height: 100vh;
     /* Passt das untere Padding an, um Platz für die Nav-Leiste UND die Safe Area zu schaffen */
-    padding: 15px 15px calc(var(--nav-height) + var(--safe-area-inset-bottom)) 15px;
+    padding: 15px 15px calc(60px + 20px + env(safe-area-inset-bottom) + 20px) 15px; /* Höhe Leiste + Abstand unten + Safe Area + Puffer */
     touch-action: pan-x pan-y;
     color: var(--text-color); /* Dunkler Text */
     -webkit-tap-highlight-color: transparent; /* Klick-Highlight auf Touch entfernen */
@@ -434,70 +434,103 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
 }
 
 /* --- Navigationsleiste --- */
+
+/* NEUE STILE FÜR NAVIGATIONSLEISTE */
 .bottom-nav {
-    display: flex;
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background-color: var(--primary-bg-color, white); /* Fallback-Farbe, falls Variable nicht definiert */
-    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(20px + env(safe-area-inset-bottom)); /* Abstand von unten + Safe Area */
+    width: calc(100% - 40px); /* Breite der Leiste, mit seitlichem Abstand */
+    max-width: 350px; /* Maximale Breite für größere Bildschirme */
+    height: 60px;
+    background-color: #1A202C; /* Sehr dunkles Grau, fast schwarz */
+    border-radius: 30px; /* Stark abgerundet */
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    display: flex;
+    justify-content: space-between; /* Geändert von space-around */
+    align-items: center;
+    padding: 0 10px; /* Horizontaler Innenabstand erhöht (vorher 10px) */
     z-index: 1000;
-
-    /* Definiere eine Basis-Höhe für den Inhalt der Navigationsleiste (Icons, Text, interne Abstände) */
-    --nav-content-height: 60px; /* Du kannst diesen Wert anpassen */
-
-    /* Die Gesamthöhe der Navigationsleiste ist die Inhaltshöhe plus der Safe Area unten */
-    height: calc(var(--nav-content-height) + env(safe-area-inset-bottom));
-
-    /* Das Padding unten sorgt dafür, dass der Inhalt der Navigationsleiste
-       (also die .nav-item Elemente) über der Home-Anzeige/Safe Area von iOS beginnt. */
-    padding-bottom: env(safe-area-inset-bottom);
-
-    /* Stellt sicher, dass Padding und Border nicht zur deklarierten Höhe addiert werden,
-       falls du padding direkt auf .bottom-nav setzen würdest.
-       Für diesen Ansatz mit --nav-content-height ist es sicherer, es explizit zu setzen. */
-    box-sizing: content-box;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
 }
 
 .nav-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    color: var(--text-secondary-color, #757575); /* Fallback */
     background-color: transparent;
     border: none;
+    color: #A0AEC0; /* Hellgrau für inaktive Icons */
     cursor: pointer;
-    text-align: center;
-    font-size: 10px; /* Beibehalten oder anpassen */
-
-    /* Verschiebe den Inhalt (Icon und Text) nach oben innerhalb des Buttons */
-    justify-content: flex-start;
-
-    /* Passe das Padding an, um den Inhalt innerhalb des Items zu positionieren */
-    padding-top: 8px;    /* Abstand des Inhalts (Icon) vom oberen Rand des nav-item */
-    padding-bottom: 5px; /* Kleinerer Abstand unten, der Rest des Platzes wird durch die Höhe der .bottom-nav bereitgestellt */
-
-    /* Stelle sicher, dass die Nav-Items die volle Höhe der .bottom-nav einnehmen.
-       Da .bottom-nav 'display: flex' hat, ist 'align-items: stretch' der Standardwert
-       für Kindelemente, was dies normalerweise bewirkt. height: 100% ist eine explizite Absicherung. */
-    height: 100%;
+    padding: 10px; /* Klickfläche */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 100 auto; /* Geändert von flex: 1 */
+    transition: color 0.2s ease, transform 0.1s ease;
 }
 
 .nav-item .material-icons {
-    font-size: 24px; /* Beibehalten oder anpassen */
-    margin-bottom: 2px; /* Abstand zwischen Icon und Label, anpassen falls 'gap' verwendet wird */
-}
-
-.nav-item .nav-label {
-    font-size: 10px; /* Beibehalten oder anpassen */
-    display: block; /* Stellt sicher, dass es unter dem Icon steht */
+    font-size: 26px; /* Icon Größe */
 }
 
 .nav-item.active {
-    color: var(--primary-color, #007bff); /* Fallback */
+    color: #FFFFFF; /* Weiß für aktives Icon */
 }
+.nav-item.active .material-icons{
+     /* Ggf. spezielles Styling für aktives Icon, z.B. falls es ein 'gefülltes' Icon sein soll und das Standard-Icon outline ist */
+}
+
+
+.nav-item:active {
+    transform: scale(0.9);
+}
+
+/* Navigationsleiste ausblenden bei Input-Fokus */
+body.nav-hidden .bottom-nav {
+    transform: translateX(-50%) translateY(100px); /* Nach unten schieben */
+    opacity: 0;
+}
+
+/* Floating Action Button (FAB) */
+.nav-fab {
+    position: fixed;
+    left: 50%;
+    bottom: calc(20px + env(safe-area-inset-bottom) + 60px - 28px - 8px); /* Positioniert relativ zum unteren Rand: (bottom-nav Abstand) + (Höhe bottom-nav) - (halbe FAB Höhe) - (Überlappung) */
+    transform: translateX(-50%);
+    width: 56px;
+    height: 56px;
+    background-color: var(--primary-color); /* Blau aus Variablen */
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 15px rgba(37, 99, 235, 0.3);
+    border: 4px solid var(--bg-color); /* Rand in Hintergrundfarbe des Body für "Cutout"-Effekt */
+    z-index: 1001; /* Über der .bottom-nav */
+    cursor: pointer;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.nav-fab .material-icons {
+    font-size: 28px;
+}
+
+.nav-fab:active {
+    transform: translateX(-50%) scale(0.95);
+}
+
+/* FAB ausblenden bei Input-Fokus */
+body.nav-hidden .nav-fab {
+    transform: translateX(-50%) translateY(100px); /* Nach unten schieben */
+    opacity: 0;
+}
+
+
+/* Entferne die Label-Anzeige, da sie nicht mehr im Design ist */
+.nav-label {
+    display: none !important;
+}
+
 
 /* --- Stile für Straßen/PLZ Suche (innerhalb mainView) --- */
 
@@ -1065,5 +1098,171 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
     vertical-align: -3px; /* Icon besser ausrichten */
     margin-right: 8px;
 }
+
+/* --- ZEITERFASSUNG (CALENDAR VIEW) --- */
+#calendarView .content-card {
+    margin-bottom: 20px;
+}
+
+.time-tracking-status-display {
+    background-color: var(--bg-color);
+    padding: 15px;
+    border-radius: var(--border-radius-std);
+    margin-bottom: 20px;
+    border: 1px solid var(--card-border);
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--card-border);
+}
+.status-item:last-child {
+    border-bottom: none;
+}
+
+.status-label {
+    font-size: 0.9em;
+    color: var(--text-color-muted, #475569);
+}
+
+.status-value {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--text-color);
+}
+#currentStatusText.active {
+    color: var(--success-color);
+}
+#currentStatusText.inactive {
+    color: var(--danger-color);
+}
+
+
+.time-tracking-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px; /* Angepasst von 0, falls Status Display darüber ist */
+}
+
+.time-tracking-buttons button {
+    flex-grow: 1;
+    padding: 12px 20px;
+    font-size: 1rem;
+    border-radius: var(--border-radius-std);
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+.time-tracking-buttons button .material-icons {
+    font-size: 22px;
+}
+
+.button-start-time {
+    background-color: var(--success-color);
+    color: var(--text-on-primary);
+}
+.button-start-time:hover {
+    background-color: #15803d; /* Dunkleres Grün */
+}
+
+.button-stop-time {
+    background-color: var(--danger-color);
+    color: var(--text-on-primary);
+}
+.button-stop-time:hover {
+    background-color: #b91c1c; /* Dunkleres Rot */
+}
+
+
+#timeTrackingHistory .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+#timeTrackingHistory .history-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+}
+#timeTrackingHistory #historyDateInput {
+    padding: 8px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius-std);
+    font-size: 0.9em;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.daily-summary-display {
+    background-color: var(--bg-color);
+    padding: 15px;
+    border-radius: var(--border-radius-std);
+    margin-bottom: 15px;
+    border: 1px solid var(--card-border);
+}
+.daily-summary-display h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1em;
+    font-weight: 600;
+    text-align: center;
+}
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    padding: 5px 0;
+}
+.summary-label {
+    color: var(--text-color-muted, #475569);
+}
+.summary-value {
+    font-weight: 500;
+}
+
+.time-entries-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.time-entry-li {
+    background-color: var(--bg-color);
+    padding: 12px 15px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius-std);
+    margin-bottom: 10px;
+    font-size: 0.9em;
+}
+.time-entry-li:last-child {
+    margin-bottom: 0;
+}
+
+.time-entry-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.time-entry-details strong {
+    font-weight: 600;
+}
+
+.time-entry-duration {
+    color: var(--text-color-muted, #475569);
+    font-size: 0.9em;
+}
+
+.list-placeholder-message { /* Wiederverwendung für noHistoryEntriesMessage */
+    color: var(--text-color-muted, #6b7280);
+}
+
 
 /* ... restliche Stile ... */

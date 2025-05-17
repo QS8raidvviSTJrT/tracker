@@ -175,19 +175,70 @@
                 </div>
             </div>
 
+            <div id="calendarView" class="view">
+                <div id="timeTrackingControls" class="content-card">
+                    <h2>Arbeitszeiterfassung</h2>
+                    <div id="timeTrackingStatusDisplay" class="time-tracking-status-display">
+                        <div class="status-item">
+                            <span class="status-label">Status:</span>
+                            <span id="currentStatusText" class="status-value">Lädt...</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Aktueller Block:</span>
+                            <span id="currentWorkDuration" class="status-value">00:00:00</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Heute Arbeit:</span>
+                            <span id="todayTotalWork" class="status-value">00:00</span>
+                        </div>
+                    </div>
+                    <div class="time-tracking-buttons">
+                        <button id="startWorkButton" onclick="startWorkTimeTracking()" class="button-start-time">
+                            <span class="material-icons">play_arrow</span> Start
+                        </button>
+                        <button id="stopWorkButton" onclick="stopWorkTimeTracking()" class="button-stop-time" style="display:none;">
+                            <span class="material-icons">stop</span> Stop
+                        </button>
+                    </div>
+                </div>
+
+                <div id="timeTrackingHistory" class="content-card">
+                    <div class="history-header">
+                        <h3>Zeiterfassungshistorie</h3>
+                        <input type="date" id="historyDateInput">
+                    </div>
+                    <div id="dailySummaryDisplay" class="daily-summary-display">
+                        <h4>Zusammenfassung für <span id="summaryDateDisplay"></span></h4>
+                        <div class="summary-item">
+                            <span class="summary-label">Gesamte Arbeitszeit:</span>
+                            <span id="summaryTotalWork" class="summary-value">--:--</span>
+                        </div>
+                    </div>
+                    <ul id="timeEntriesList" class="time-entries-list">
+                        <!-- Listeneinträge werden hier dynamisch von JS eingefügt -->
+                    </ul>
+                    <p id="noHistoryEntriesMessage" class="list-placeholder-message" style="display:none; text-align:center; padding: 15px;">Keine Einträge für diesen Tag.</p>
+                </div>
+
+                <div id="calendarLoadingIndicator" class="loading-indicator-view" style="display: none;">
+                    <div class="loading-spinner-view"></div>
+                </div>
+                <div id="calendarErrorDisplay" class="error-display-view" style="display: none;"></div>
+            </div>
+
         </div>
 
         <nav class="bottom-nav">
-            <button class="nav-item active" onclick="switchView('mainView', 'SellX Solutions')">
-                <span class="material-icons">home</span>
-                <!--<span class="nav-label">Straßen</span>-->
-            </button>
             <button class="nav-item" onclick="switchView('statsView', 'Statistik')">
                 <span class="material-icons">bar_chart</span>
-                <!--<span class="nav-label">Statistik</span>-->
+                <!--<span class="nav-label">Straßen</span>-->
             </button>
             <button class="nav-item" onclick="switchView('leaderboardView', 'Leaderboard')">
                 <span class="material-icons">emoji_events</span>
+                <!--<span class="nav-label">Statistik</span>-->
+            </button>
+            <button class="nav-item" onclick="switchView('calendarView', 'Arbeitszeiten')">
+                <span class="material-icons">schedule</span>
                 <!--<span class="nav-label">Board</span>-->
             </button>
             <button class="nav-item" onclick="switchView('settingsView', 'Einstellungen')">
@@ -195,6 +246,11 @@
                 <!--<span class="nav-label">Mehr</span>-->
             </button>
         </nav>
+
+        <!-- Neuer FAB (Floating Action Button) -->
+        <button class="nav-fab" onclick="switchView('mainView', 'SellX Solutions')">
+            <span class="material-icons">route</span>
+        </button>
 
     </div>
     

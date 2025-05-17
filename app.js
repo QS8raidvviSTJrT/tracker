@@ -57,6 +57,24 @@ const settingsStatus = document.getElementById('settingsStatus');
 const streetListPlaceholder = document.getElementById('streetListPlaceholder'); // Referenz zum Platzhalter
 const alphabetFilterContainer = document.getElementById('alphabetFilterContainer'); // NEU
 
+// NEU: Referenzen für Kalender-View-Elemente (Zeiterfassung)
+const calendarView = document.getElementById('calendarView'); // Ist schon da
+// Die folgenden werden neu deklariert für Klarheit, auch wenn sie schon im HTML sind
+const calendarLoadingIndicator = document.getElementById('calendarLoadingIndicator');
+const calendarErrorDisplay = document.getElementById('calendarErrorDisplay');
+// const calendarContent = document.getElementById('calendarContent'); // Wird nicht direkt verwendet, Inhalt ist in calendarView
+
+// DOM Elemente für Zeiterfassung
+let timeTrackingControls, timeTrackingStatusDisplay, currentStatusText, currentWorkDuration, todayTotalWork; // todayTotalBreak entfernt
+let startWorkButton, stopWorkButton;
+let timeTrackingHistory, historyDateInput, dailySummaryDisplay, summaryDateDisplay, summaryTotalWork; // summaryTotalBreak entfernt
+let timeEntriesList, noHistoryEntriesMessage;
+
+// Globale Zustandsvariablen für Zeiterfassung
+let activeWorkEntryId = null;
+let workTimerInterval = null;
+let workStartTime = null;
+
 // NEU: Referenzen für Login-Elemente
 const loginEmailInput = document.getElementById('loginEmail'); // E-Mail-Feld
 const loginPasswordInput = document.getElementById('loginPassword'); // Passwortfeld
@@ -1026,6 +1044,10 @@ window.switchView = function(viewIdToShow, viewTitle) {
              console.log("[switchView] Lade Daten für Einstellungen");
              loadSettingsData(); // Einstellungen laden
             break;
+        case 'calendarView': // NEUER CASE
+            console.log("[switchView] Lade Daten für Kalender");
+            loadCalendarData(); // Kalenderdaten laden (Platzhalterfunktion)
+            break;
         case 'mainView':
              console.log("[switchView] Aktiviere Hauptansicht");
              updateGreetingPlaceholder(); // NEU: Platzhalter-Begrüßung aktualisieren
@@ -1679,3 +1701,416 @@ function setupLoginEnterListeners() {
     }
 }
 // === ENDE NEU ===
+
+// NEUE Platzhalter-Funktion für Kalenderdaten
+async function loadCalendarData() {
+    if (!currentUser || !calendarView ) return;
+    console.log("[loadCalendarData] Initializing Calendar View for Time Tracking.");
+
+    // DOM Elemente initialisieren (einmalig oder bei Bedarf neu)
+    initializeCalendarViewDOMElements();
+
+
+    if (calendarErrorDisplay) calendarErrorDisplay.style.display = 'none';
+    if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'flex';
+    if (currentStatusText) currentStatusText.textContent = "Lädt...";
+
+
+    try {
+        // Heutiges Datum für den Kalender-Input setzen
+        if (historyDateInput) {
+            if (!historyDateInput.value) { // Nur setzen, wenn leer, um manuelle Auswahl nicht zu überschreiben
+                historyDateInput.valueAsDate = new Date();
+            }
+            historyDateInput.removeEventListener('change', handleHistoryDateChange); // Listener entfernen, falls schon vorhanden
+            historyDateInput.addEventListener('change', handleHistoryDateChange);
+        }
+        
+        await checkActiveWorkEntry(); // Prüfen, ob ein Eintrag aktiv ist
+        await loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date()));
+
+    } catch (error) {
+        console.error("Fehler beim Laden der Kalenderdaten:", error);
+        if (calendarErrorDisplay) {
+            calendarErrorDisplay.textContent = `Fehler beim Laden der Kalenderdaten: ${error.message}`;
+            calendarErrorDisplay.style.display = 'block';
+        }
+        if (currentStatusText) currentStatusText.textContent = "Fehler";
+    } finally {
+        if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'none';
+    }
+}
+
+function initializeCalendarViewDOMElements() {
+    timeTrackingControls = document.getElementById('timeTrackingControls');
+    timeTrackingStatusDisplay = document.getElementById('timeTrackingStatusDisplay');
+    currentStatusText = document.getElementById('currentStatusText');
+    currentWorkDuration = document.getElementById('currentWorkDuration');
+    todayTotalWork = document.getElementById('todayTotalWork');
+    // todayTotalBreak = document.getElementById('todayTotalBreak'); // Entfernt
+    startWorkButton = document.getElementById('startWorkButton');
+    stopWorkButton = document.getElementById('stopWorkButton');
+
+    timeTrackingHistory = document.getElementById('timeTrackingHistory');
+    historyDateInput = document.getElementById('historyDateInput');
+    dailySummaryDisplay = document.getElementById('dailySummaryDisplay');
+    summaryDateDisplay = document.getElementById('summaryDateDisplay');
+    summaryTotalWork = document.getElementById('summaryTotalWork');
+    // summaryTotalBreak = document.getElementById('summaryTotalBreak'); // Entfernt
+    timeEntriesList = document.getElementById('timeEntriesList');
+    noHistoryEntriesMessage = document.getElementById('noHistoryEntriesMessage');
+}
+
+
+function getLocalDateString(date) {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function handleHistoryDateChange() {
+    if (historyDateInput) {
+        loadDailySummaryAndEntries(historyDateInput.value);
+    }
+}
+
+async function checkActiveWorkEntry() {
+    if (!currentUser) return;
+    console.log("Checking for active work entry...");
+    try {
+        const { data, error } = await supabaseClient
+            .from('work_time_entries')
+            .select('id, start_time')
+            .eq('user_id', currentUser.id)
+            .is('end_time', null) // end_time IS NULL
+            .order('start_time', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+            activeWorkEntryId = data.id;
+            workStartTime = new Date(data.start_time);
+            updateWorkUIActive();
+        } else {
+            activeWorkEntryId = null;
+            workStartTime = null;
+            updateWorkUIInactive();
+        }
+    } catch (error) {
+        console.error("Error checking active work entry:", error);
+        showCalendarError("Fehler beim Prüfen des aktiven Eintrags.");
+        updateWorkUIInactive(); // Fallback
+    }
+}
+
+window.startWorkTimeTracking = async function() {
+    if (!currentUser || activeWorkEntryId) return; // Verhindere Doppelstart
+
+    console.log("Starting work time tracking...");
+    if (startWorkButton) startWorkButton.disabled = true;
+    if (currentStatusText) currentStatusText.textContent = "Starte...";
+
+    const newStartTime = new Date();
+    let notesContent = null; // Initialisiere notesContent
+
+    // Versuche, die Geolokation abzurufen
+    try {
+        const position = await new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject(new Error("Geolocation wird nicht unterstützt."));
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true, // Fordere höhere Genauigkeit an
+                timeout: 10000,         // 10 Sekunden Timeout
+                maximumAge: 60000         // Akzeptiere gecachte Position bis zu 1 Minute alt
+            });
+        });
+
+        const { latitude, longitude } = position.coords;
+        notesContent = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        console.log("Standort für Notiz erfasst:", notesContent);
+
+    } catch (geoError) {
+        console.warn("Fehler beim Abrufen der Geolokation für Notiz:", geoError.message);
+        // Fahre fort, auch wenn der Standort nicht ermittelt werden konnte.
+        // notesContent bleibt null oder leer.
+    }
+
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('work_time_entries')
+            .insert({
+                user_id: currentUser.id,
+                start_time: newStartTime.toISOString(),
+                notes: notesContent // Füge den Standort-Link (oder null) hier ein
+            })
+            .select('id, start_time')
+            .single();
+
+        if (error) throw error;
+
+        activeWorkEntryId = data.id;
+        workStartTime = new Date(data.start_time); // Verwende die vom Server bestätigte Startzeit
+        updateWorkUIActive();
+        loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); // Historie aktualisieren
+    } catch (error) {
+        console.error("Error starting work:", error);
+        showCalendarError("Fehler beim Starten der Arbeitszeit.");
+        updateWorkUIInactive(); // Zurücksetzen
+        if (startWorkButton) startWorkButton.disabled = false;
+    }
+};
+
+window.stopWorkTimeTracking = async function() {
+    if (!currentUser || !activeWorkEntryId) return;
+
+    console.log("Stopping work time tracking...");
+    if (stopWorkButton) stopWorkButton.disabled = true;
+    if (currentStatusText) currentStatusText.textContent = "Stoppe...";
+
+    const newEndTime = new Date();
+    let durationMinutes = 0;
+    if (workStartTime) {
+        durationMinutes = Math.round((newEndTime - workStartTime) / (1000 * 60));
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('work_time_entries')
+            .update({
+                end_time: newEndTime.toISOString(),
+                duration_minutes: durationMinutes
+            })
+            .eq('id', activeWorkEntryId);
+
+        if (error) throw error;
+
+        activeWorkEntryId = null;
+        workStartTime = null;
+        updateWorkUIInactive();
+        if (currentWorkDuration) currentWorkDuration.textContent = "00:00:00"; // Timer zurücksetzen
+        loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); // Historie aktualisieren
+    } catch (error) {
+        console.error("Error stopping work:", error);
+        showCalendarError("Fehler beim Stoppen der Arbeitszeit.");
+        updateWorkUIActive(); // Bleibe im aktiven Zustand, wenn Fehler
+        if (stopWorkButton) stopWorkButton.disabled = false;
+    }
+};
+
+function updateWorkUIActive() {
+    if (currentStatusText) {
+        currentStatusText.textContent = workStartTime ? `Eingestempelt (${formatTime(workStartTime)})` : "Eingestempelt";
+        currentStatusText.className = 'status-value active';
+    }
+    if (startWorkButton) startWorkButton.style.display = 'none';
+    if (stopWorkButton) {
+        stopWorkButton.style.display = 'inline-flex';
+        stopWorkButton.disabled = false;
+    }
+    startDurationTimer();
+}
+
+function updateWorkUIInactive() {
+    if (currentStatusText) {
+        currentStatusText.textContent = "Ausgestempelt";
+        currentStatusText.className = 'status-value inactive';
+    }
+    if (startWorkButton) {
+        startWorkButton.style.display = 'inline-flex';
+        startWorkButton.disabled = false;
+    }
+    if (stopWorkButton) stopWorkButton.style.display = 'none';
+    stopDurationTimer();
+    if (currentWorkDuration) currentWorkDuration.textContent = "00:00:00";
+}
+
+function startDurationTimer() {
+    stopDurationTimer(); // Sicherstellen, dass kein alter Timer läuft
+    if (!workStartTime) return;
+
+    workTimerInterval = setInterval(() => {
+        const now = new Date();
+        const diffMs = now - workStartTime;
+        if (currentWorkDuration) {
+            currentWorkDuration.textContent = formatMillisecondsToHMS(diffMs);
+        }
+    }, 1000);
+}
+
+function stopDurationTimer() {
+    if (workTimerInterval) {
+        clearInterval(workTimerInterval);
+        workTimerInterval = null;
+    }
+}
+
+async function loadDailySummaryAndEntries(dateString) {
+    if (!currentUser || !timeEntriesList || !noHistoryEntriesMessage) {
+        console.warn("loadDailySummaryAndEntries: Required DOM elements or user not found.");
+        return;
+    }
+    
+    console.log(`Loading entries for date: ${dateString}`);
+    if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'flex';
+    timeEntriesList.innerHTML = '';
+    noHistoryEntriesMessage.style.display = 'none';
+    if (summaryDateDisplay) summaryDateDisplay.textContent = formatDateForDisplay(dateString);
+    if (summaryTotalWork) summaryTotalWork.textContent = '--:--';
+    // if (summaryTotalBreak) summaryTotalBreak.textContent = '--:--'; // Entfernt
+    if (todayTotalWork) todayTotalWork.textContent = '00:00'; // Reset daily totals for today as well
+    // if (todayTotalBreak) todayTotalBreak.textContent = '00:00'; // Entfernt
+
+
+    try {
+        const startDate = new Date(dateString + "T00:00:00");
+        const endDate = new Date(dateString + "T23:59:59.999");
+
+        const { data: entries, error } = await supabaseClient
+            .from('work_time_entries')
+            .select('id, start_time, end_time, duration_minutes, notes')
+            .eq('user_id', currentUser.id)
+            .gte('start_time', startDate.toISOString())
+            .lte('start_time', endDate.toISOString()) // Einträge, die an diesem Tag gestartet wurden
+            .order('start_time', { ascending: true });
+
+        if (error) throw error;
+
+        if (entries.length === 0) {
+            noHistoryEntriesMessage.style.display = 'block';
+        } else {
+            let totalWorkMinutesForDay = 0;
+            // let totalBreakMinutesForDay = 0; // Entfernt
+
+            entries.forEach((entry, index) => {
+                const li = document.createElement('li');
+                li.className = 'time-entry-li';
+                
+                const startTimeFormatted = formatTime(new Date(entry.start_time));
+                const endTimeFormatted = entry.end_time ? formatTime(new Date(entry.end_time)) : 'Laufend';
+                const durationFormatted = entry.duration_minutes ? formatMinutesToHM(entry.duration_minutes) : '-';
+
+                let notesDisplay = escapeHtml(entry.notes || '');
+                if (entry.notes && (entry.notes.startsWith('http://') || entry.notes.startsWith('https://'))) {
+                    notesDisplay = `<a href="${escapeHtml(entry.notes)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.notes)}</a>`;
+                }
+
+                li.innerHTML = `
+                    <div class="time-entry-details">
+                        <strong>${startTimeFormatted} - ${endTimeFormatted}</strong>
+                        <span>${notesDisplay}</span>
+                    </div>
+                    <div class="time-entry-duration">Dauer: ${durationFormatted}</div>
+                `;
+                timeEntriesList.appendChild(li);
+
+                if (entry.duration_minutes) {
+                    totalWorkMinutesForDay += entry.duration_minutes;
+                }
+
+                // Pausenberechnung zum nächsten Eintrag // KOMPLETTER BLOCK ENTFERNT
+                // if (entry.end_time && index < entries.length - 1) {
+                //     const nextEntry = entries[index + 1];
+                //     const breakStart = new Date(entry.end_time);
+                //     const breakEnd = new Date(nextEntry.start_time);
+                //     if (breakEnd > breakStart) {
+                //         const breakDurationMs = breakEnd - breakStart;
+                //         totalBreakMinutesForDay += Math.round(breakDurationMs / (1000 * 60));
+                //     }
+                // }
+            });
+
+            if (summaryTotalWork) summaryTotalWork.textContent = formatMinutesToHM(totalWorkMinutesForDay);
+            // if (summaryTotalBreak) summaryTotalBreak.textContent = formatMinutesToHM(totalBreakMinutesForDay); // Entfernt
+
+            // Wenn das angezeigte Datum heute ist, aktualisiere auch die "Heute" Anzeige
+            const todayDateString = getLocalDateString(new Date());
+            if (dateString === todayDateString) {
+                if (todayTotalWork) todayTotalWork.textContent = formatMinutesToHM(totalWorkMinutesForDay);
+                // if (todayTotalBreak) todayTotalBreak.textContent = formatMinutesToHM(totalBreakMinutesForDay); // Entfernt
+            }
+        }
+
+    } catch (err) {
+        console.error("Error loading daily entries:", err);
+        showCalendarError("Fehler beim Laden der Tageshistorie.");
+        noHistoryEntriesMessage.style.display = 'block'; // Zeige "keine Einträge" auch bei Fehler
+    } finally {
+        if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'none';
+    }
+}
+
+// --- Hilfsfunktionen für Zeiterfassung ---
+function formatTime(date) {
+    if (!date) return '--:--';
+    return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatMinutesToHM(minutes) {
+    if (minutes === null || isNaN(minutes)) return '--:--';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+function formatMillisecondsToHMS(ms) {
+    if (ms === null || isNaN(ms) || ms < 0) return '00:00:00';
+    let seconds = Math.floor(ms / 1000);
+    let minutes = Math.floor(seconds / 60);
+    let hours = Math.floor(minutes / 60);
+
+    seconds = seconds % 60;
+    minutes = minutes % 60;
+
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatDateForDisplay(dateString) {
+    const date = new Date(dateString + "T00:00:00"); // Sicherstellen, dass es als lokales Datum interpretiert wird
+    return date.toLocaleDateString('de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function showCalendarError(message) {
+    if (calendarErrorDisplay) {
+        calendarErrorDisplay.textContent = message;
+        calendarErrorDisplay.style.display = 'block';
+        setTimeout(() => {
+            calendarErrorDisplay.style.display = 'none';
+            calendarErrorDisplay.textContent = '';
+        }, 5000);
+    }
+}
+
+
+// --- Aufräumen beim Verlassen der View ---
+// Dies ist ein Beispiel, wie man den Timer stoppen könnte.
+// switchView müsste angepasst werden, um eine "onLeave" Callback für Views zu unterstützen.
+// Für den Moment wird der Timer global gestoppt/gestartet, wenn die Buttons geklickt werden
+// oder die View geladen wird.
+
+// ... bestehender Code ...
+// Am Ende der Datei oder wo passend:
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        // Optional: Hier könnte man den Timer anhalten oder eine Notiz speichern,
+        // falls die App im Hintergrund ist. Fürs Erste belassen wir es bei der
+        // kontinuierlichen Zeitmessung, solange die Seite offen ist.
+        console.log("Seite ist jetzt im Hintergrund / nicht sichtbar.");
+    } else if (document.visibilityState === 'visible') {
+        console.log("Seite ist wieder sichtbar.");
+        // Beim Sichtbarwerden den Status neu prüfen, falls die Kalender-View aktiv ist
+        if (calendarView && calendarView.classList.contains('active-view')) {
+            checkActiveWorkEntry(); // UI und Timer ggf. neu starten
+            // Historie für das aktuell im Datepicker ausgewählte Datum neu laden.
+            if (historyDateInput && historyDateInput.value) {
+                 loadDailySummaryAndEntries(historyDateInput.value);
+            }
+        }
+    }
+});
+
