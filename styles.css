@@ -509,6 +509,14 @@ input.error-input {
      /* Ggf. spezielles Styling für aktives Icon, z.B. falls es ein 'gefülltes' Icon sein soll und das Standard-Icon outline ist */
 }
 
+/* NEU: Vergrößerter Abstand zwischen dem zweiten und dritten Navigationsitem */
+.nav-item:nth-child(2) {
+    margin-right: 55px; /* Zusätzlicher Abstand rechts vom zweiten Item */
+}
+
+.nav-item:nth-child(3) {
+    margin-left: 15px; /* Zusätzlicher Abstand links vom dritten Item */
+}
 
 .nav-item:active {
     transform: scale(0.9);
