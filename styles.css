@@ -567,37 +567,112 @@ body.nav-hidden .nav-fab {
 /* === NEU: Stile für Alphabet-Filter === */
 .alphabet-filter-container {
     display: flex; /* Buttons nebeneinander */
-    flex-wrap: wrap; /* Umbruch bei Bedarf */
-    justify-content: center; /* Zentrieren */
-    gap: 4px; /* Kleinerer Abstand zwischen Buttons */
+    flex-direction: column; /* Toggle-Button und Wrapper untereinander */
+    align-items: stretch; /* Elemente sollen die Breite des Containers nutzen */
+    gap: 0; /* Kein direkter Abstand zwischen Toggle und Wrapper */
     margin-bottom: 15px; /* Abstand zur Liste */
-    padding: 8px 2px; /* Innenabstand, seitlich reduziert */
-    background-color: var(--card-bg); /* Leichter Hintergrund */
+    /* background-color: var(--card-bg); */ /* Hintergrund ist jetzt im Toggle und Wrapper */
     border-radius: var(--border-radius-std);
-    border: 1px solid var(--card-border);
+    /* border: 1px solid var(--card-border); */ /* Rand ist jetzt im Toggle und Wrapper */
     /* Wird von JS ein-/ausgeblendet */
 }
+
+#alphabetToggleAllButton {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 12px 15px; /* Angepasst für besseres Aussehen */
+    font-size: 1em; /* Normale Schriftgröße */
+    text-align: left;
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius-std);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    margin-bottom: 0; /* Wichtig, da Wrapper direkt folgen kann */
+}
+
+#alphabetToggleAllButton:hover {
+    background-color: #e9ecef; /* Leichter Hover-Effekt */
+}
+
+#alphabetToggleAllButton.active {
+    /* Kann hier spezifischer gestylt werden, wenn "Alle" aktiv ist,
+       aber die primäre Aktiv-Anzeige ist der Text und die Buchstabenbuttons */
+    /* background-color: var(--primary-color); */
+    /* color: var(--text-on-primary); */
+    /* border-color: var(--primary-color); */
+}
+#alphabetToggleAllButton.active .expand-arrow {
+    /* color: var(--text-on-primary); */
+}
+
+
+#alphabetToggleAllButton .expand-arrow {
+    font-size: 24px; /* Passende Icongröße */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Sanftere Apple-ähnliche Transition */
+}
+
+/* Container für die eigentlichen Buchstaben-Buttons */
+#alphabetLettersWrapper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* Buchstaben linksbündig starten lassen */
+    gap: 6px; /* Etwas mehr Abstand */
+    padding: 0; /* Wird bei .open gesetzt */
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-top: none; /* Vermeidet Doppelrand mit ToggleButton */
+    border-radius: 0 0 var(--border-radius-std) var(--border-radius-std);
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out, padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+}
+
+/* Zustand, wenn der Filter ausgeklappt ist */
+.alphabet-filter-container.expanded #alphabetToggleAllButton {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.alphabet-filter-container.expanded #alphabetToggleAllButton .expand-arrow {
+    transform: rotate(180deg);
+}
+
+.alphabet-filter-container.expanded #alphabetLettersWrapper {
+    max-height: 200px; /* Ausreichende Höhe, kann angepasst werden */
+    opacity: 1;
+    padding: 10px; /* Innenabstand, wenn ausgeklappt */
+    /* border-top: 1px solid var(--card-border); */ /* Optional für klare Trennung */
+}
+
 
 /* In deiner styles.css Datei */
 
 .alphabet-button {
     /* Bestehende Stile beibehalten oder anpassen */
-    padding: 12px 14px; /* Mehr Innenabstand oben/unten und seitlich */
-    font-size: 1.2em;   /* Größere Schrift */
+    padding: 10px 12px; /* Etwas kompakter für viele Buttons */
+    font-size: 1.2em;   /* GRÖSSERE Schrift */
     min-width: 44px;    /* Mindestbreite, um sicherzustellen, dass auch schmale Buchstaben gut klickbar sind */
     min-height: 44px;   /* Mindesthöhe */
-    display: inline-flex; /* Stellt sicher, dass padding korrekt angewendet wird und der Inhalt zentriert ist */
+    display: inline-flex; 
     justify-content: center;
     align-items: center;
-    margin: 3px;        /* Etwas Abstand zwischen den Buttons */
-    border-radius: 6px; /* Leicht abgerundete Ecken, falls gewünscht */
-    /* Weitere Stile wie Hintergrund, Farbe, Rand etc. hier oder beibehalten */
+    /* margin: 3px; Entfernt, da gap im Wrapper verwendet wird */
+    border-radius: var(--border-radius-std, 6px); 
+    background-color: #f8f9fa; /* Heller Hintergrund für einzelne Buchstaben */
+    border: 1px solid var(--card-border);
+    color: var(--primary-color); /* Blaue Schrift für Klickbarkeit */
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-
-
 .alphabet-button:hover {
-    background-color: #cbd5e1; /* Dunklerer Hover */
+    background-color: #e9ecef; /* Dunklerer Hover */
+    border-color: #adb5bd;
 }
 
 .alphabet-button.active {

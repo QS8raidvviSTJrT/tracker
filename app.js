@@ -41,6 +41,7 @@ let currentEditingEntryId = null; // ID des Eintrags, der gerade bearbeitet wird
 let statsChartInstance = null; // Variable für die Chart-Instanz
 let currentAlphabetFilter = null; // Aktuell ausgewählter Buchstabe
 let currentSortOrder = 'house_number_asc'; // NEU: Standard-Sortierreihenfolge
+let isAlphabetFilterExpanded = false; // NEU: Zustand für den expandierten Filter
 
 // --- DOM Elemente ---
 const loginContainer = document.getElementById('loginContainer');
@@ -684,7 +685,12 @@ async function selectStreet(streetName, postalCode) {
 
     // Andere UI-Elemente anpassen
     if (streetListContainer) streetListContainer.style.display = 'none';
-    if (alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
+    if (alphabetFilterContainer) {
+        alphabetFilterContainer.style.display = 'none'; // Alphabet-Filter ausblenden
+        // Reset alphabet filter state when going to street detail
+        // isAlphabetFilterExpanded = false; // Wird in backToStreetList() korrekt behandelt
+        // alphabetFilterContainer.classList.remove('expanded');
+    }
     
     currentSortOrder = getFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY)?.sortOrder || 'house_number_asc'; // Sortierung ggf. aus Cache wiederherstellen
 
@@ -1182,10 +1188,15 @@ function backToStreetList() {
     
     removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY); 
 
-    currentAlphabetFilter = null; 
-    document.querySelectorAll('.alphabet-button').forEach(btn => btn.classList.remove('active'));
-    const allBtn = alphabetFilterContainer?.querySelector('.alphabet-button[data-letter="Alle"]'); // Spezifischer Selektor
-    if(allBtn) allBtn.classList.add('active');
+    // Alphabet-Filter Zustand zurücksetzen und ggf. neu rendern/anzeigen
+    isAlphabetFilterExpanded = false; // Standardmäßig einklappen
+    if (alphabetFilterContainer) {
+        alphabetFilterContainer.classList.remove('expanded');
+        // renderAlphabetFilter(); // Stellt sicher, dass es korrekt gezeichnet wird für "Alle"
+    }
+    currentAlphabetFilter = 'Alle'; 
+    // updateAlphabetFilterActiveState(); // Wird von renderAlphabetFilter oder displayStreets (indirekt) gecallt
+    // updateToggleArrowIcon(); // Wird von renderAlphabetFilter gecallt
 
     const cachedStreetData = getFromLocalStorage(LS_STREET_CACHE_KEY);
     const currentPlz = plzInput.value.trim();
@@ -1195,6 +1206,9 @@ function backToStreetList() {
         if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
         if (streetListContainer) streetListContainer.innerHTML = ''; 
         displayStreets(cachedStreetData.streets, currentPlz); 
+        if(alphabetFilterContainer && cachedStreetData.streets.length > 0) {
+            alphabetFilterContainer.style.display = 'flex'; // Sicherstellen, dass Filter sichtbar ist
+        }
     } else {
         if (streetListContainer) streetListContainer.innerHTML = ''; 
         if (streetListPlaceholder) {
@@ -1207,7 +1221,6 @@ function backToStreetList() {
     if (streetListContainer) streetListContainer.style.display = 'flex';
     if (currentViewTitleElement) currentViewTitleElement.textContent = 'SellX Solutions'; // Standardtitel wiederherstellen
     if (headerControls) headerControls.style.display = 'flex'; // Header-Controls für Straßenliste anzeigen
-
 
     currentSelectedStreetId = null;
     currentHouseEntries = [];
@@ -1402,74 +1415,153 @@ function handleSettingsEnter(event) {
 
 // === NEUE FUNKTIONEN FÜR ALPHABET FILTER ===
 
-// Rendert die Alphabet-Buttons
+// Rendert die Alphabet-Buttons und den Toggle
 function renderAlphabetFilter() {
     if (!alphabetFilterContainer) return;
     alphabetFilterContainer.innerHTML = ''; // Leeren
 
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
-    // Button für "Alle" hinzufügen
-    const allButton = createAlphabetButton('Alle');
-    allButton.classList.add('active'); // Standardmäßig aktiv
-    alphabetFilterContainer.appendChild(allButton);
+    // Toggle-Button (früher "Alle"-Button)
+    const toggleButton = document.createElement('button');
+    toggleButton.id = 'alphabetToggleAllButton';
+    toggleButton.className = 'alphabet-button'; // Nutzt vorhandene Basis-Stile
+    toggleButton.innerHTML = `
+        <span id="alphabetToggleLabel">Alle</span>
+        <span class="material-icons expand-arrow">expand_more</span>
+    `;
+    toggleButton.onclick = () => {
+        isAlphabetFilterExpanded = !isAlphabetFilterExpanded;
+        alphabetFilterContainer.classList.toggle('expanded', isAlphabetFilterExpanded);
+        updateToggleArrowIcon();
 
-    // Buchstaben A-Z
+        // Wenn der Filter geschlossen wird und nicht "Alle" aktiv war,
+        // oder wenn er einfach geschlossen wird, soll "Alle" aktiv werden.
+        if (!isAlphabetFilterExpanded) {
+            filterStreetsByLetter('Alle');
+        }
+    };
+    alphabetFilterContainer.appendChild(toggleButton);
+
+    // Wrapper für die Buchstaben A-Z
+    const lettersWrapper = document.createElement('div');
+    lettersWrapper.id = 'alphabetLettersWrapper';
+    alphabetFilterContainer.appendChild(lettersWrapper);
+
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
     alphabet.forEach(letter => {
-        alphabetFilterContainer.appendChild(createAlphabetButton(letter));
+        const button = createAlphabetButtonForWrapper(letter);
+        lettersWrapper.appendChild(button);
     });
 
-    // Optional: Button für Zahlen/Sonderzeichen
-    // const otherButton = createAlphabetButton('#');
-    // alphabetFilterContainer.appendChild(otherButton);
+    updateAlphabetFilterActiveState(); // Initialen aktiven Zustand setzen
+    updateToggleArrowIcon(); // Initiales Pfeil-Icon setzen
+    alphabetFilterContainer.classList.toggle('expanded', isAlphabetFilterExpanded); // Initialen expand-Zustand
 }
 
-// Erstellt einen einzelnen Alphabet-Button
-function createAlphabetButton(letter) {
+// Erstellt einen einzelnen Alphabet-Button für den Wrapper
+function createAlphabetButtonForWrapper(letter) {
     const button = document.createElement('button');
     button.textContent = letter;
-    button.className = 'alphabet-button';
-    button.type = 'button'; // Wichtig, um Formularabsendung zu verhindern
+    button.className = 'alphabet-button'; // Nutzt vorhandene Basis-Stile
+    button.type = 'button';
+    button.dataset.letter = letter; // Data-Attribut zum einfachen Finden
     button.onclick = () => {
         filterStreetsByLetter(letter);
-        // Aktiven Zustand setzen
-        document.querySelectorAll('.alphabet-button').forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
+        // Der Wrapper soll offen bleiben, wenn ein Buchstabe gewählt wird
+        if (!isAlphabetFilterExpanded) {
+            isAlphabetFilterExpanded = true;
+            alphabetFilterContainer.classList.toggle('expanded', true);
+            updateToggleArrowIcon();
+        }
     };
     return button;
 }
 
-// Filtert die Liste nach Anfangsbuchstaben
+// Filtert die Liste nach Anfangsbuchstaben und aktualisiert den aktiven Zustand
 function filterStreetsByLetter(letter) {
     console.log(`[filterStreetsByLetter] Filtering by: ${letter}`);
-    if (!streetListContainer) return;
     currentAlphabetFilter = letter; // Aktuellen Filter speichern
 
+    if (!streetListContainer) return;
+
     const streetItems = streetListContainer.querySelectorAll('.street-item');
+    let hasVisibleItems = false;
     streetItems.forEach(item => {
         const streetName = item.textContent.trim();
         let show = false;
 
         if (letter === 'Alle') {
             show = true;
-        } else if (letter === '#') {
-            // Zeige Elemente, die nicht mit A-Z beginnen (optional)
-            show = !/^[a-z]/i.test(streetName);
         } else {
-            // Zeige Elemente, die mit dem Buchstaben beginnen (Groß/Kleinschreibung ignorieren)
             show = streetName.toLowerCase().startsWith(letter.toLowerCase());
         }
 
         item.style.display = show ? 'block' : 'none';
+        if (show) hasVisibleItems = true;
     });
-
-    // "Kein Treffer"-Nachricht entfernen, da dies keine leere Liste bedeutet
-    const noFilterResultsMsg = streetListContainer.querySelector('.no-filter-results');
-    if (noFilterResultsMsg) noFilterResultsMsg.remove();
-     // Platzhalter auch entfernen, falls er noch da ist
+    
+    // "Kein Treffer"-Nachricht (optional, falls gewünscht für Filter ohne Ergebnis)
+    const noFilterResultsMsgId = 'noFilterResultsMessage';
+    let noFilterResultsMsg = streetListContainer.querySelector(`#${noFilterResultsMsgId}`);
+    if (!hasVisibleItems && letter !== 'Alle') {
+        if (!noFilterResultsMsg) {
+            noFilterResultsMsg = document.createElement('p');
+            noFilterResultsMsg.id = noFilterResultsMsgId;
+            noFilterResultsMsg.style.textAlign = 'center';
+            noFilterResultsMsg.style.padding = '20px';
+            noFilterResultsMsg.textContent = `Keine Straßen beginnend mit "${letter}".`;
+            streetListContainer.appendChild(noFilterResultsMsg);
+        }
+    } else {
+        if (noFilterResultsMsg) noFilterResultsMsg.remove();
+    }
      if (streetListPlaceholder && streetListPlaceholder.parentNode === streetListContainer) {
-         streetListPlaceholder.style.display = 'none';
+         streetListPlaceholder.style.display = hasVisibleItems ? 'none' : 'flex';
      }
+
+    updateAlphabetFilterActiveState();
 }
+
+// NEU: Aktualisiert den visuellen Zustand (active class) der Filterbuttons
+function updateAlphabetFilterActiveState() {
+    const toggleButton = document.getElementById('alphabetToggleAllButton');
+    const toggleLabel = document.getElementById('alphabetToggleLabel'); // Label im Toggle-Button
+    
+    if (toggleButton && toggleLabel) {
+        if (currentAlphabetFilter === 'Alle') {
+            toggleButton.classList.add('active');
+            toggleLabel.textContent = 'Alle';
+        } else {
+            toggleButton.classList.remove('active');
+            // Zeige den aktiven Buchstaben im Toggle-Button-Label, wenn der Filter zugeklappt ist
+            if (!isAlphabetFilterExpanded && currentAlphabetFilter) {
+                 toggleLabel.textContent = currentAlphabetFilter;
+            } else {
+                 toggleLabel.textContent = 'Alle'; // Oder 'Filter'
+            }
+        }
+    }
+
+    const lettersWrapper = document.getElementById('alphabetLettersWrapper');
+    if (lettersWrapper) {
+        const letterButtons = lettersWrapper.querySelectorAll('.alphabet-button');
+        letterButtons.forEach(btn => {
+            if (btn.dataset.letter === currentAlphabetFilter) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+}
+
+// NEU: Aktualisiert das Pfeil-Icon im Toggle-Button
+function updateToggleArrowIcon() {
+    const arrowIcon = document.querySelector('#alphabetToggleAllButton .expand-arrow');
+    if (arrowIcon) {
+        arrowIcon.textContent = isAlphabetFilterExpanded ? 'expand_less' : 'expand_more';
+    }
+}
+
 
 // === ENDE NEUE FUNKTIONEN ===
 
