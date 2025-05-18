@@ -619,9 +619,10 @@ body.nav-hidden .nav-fab {
 #alphabetLettersWrapper {
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-start; /* Buchstaben linksbündig starten lassen */
-    gap: 6px; /* Etwas mehr Abstand */
-    padding: 0; /* Wird bei .open gesetzt */
+    justify-content: space-between; /* Verteilt Buttons gleichmäßig mit äußerem Abstand */
+    --alphabet-wrapper-gap: 4px; /* Etwas kleinerer Abstand zwischen den Buchstaben-Buttons */
+    gap: var(--alphabet-wrapper-gap);
+    padding: 0; /* Wird bei .expanded gesetzt */
     background-color: var(--card-bg);
     border: 1px solid var(--card-border);
     border-top: none; /* Vermeidet Doppelrand mit ToggleButton */
@@ -644,44 +645,113 @@ body.nav-hidden .nav-fab {
 }
 
 .alphabet-filter-container.expanded #alphabetLettersWrapper {
-    max-height: 200px; /* Ausreichende Höhe, kann angepasst werden */
+    max-height: 250px; /* Ausreichende Höhe für ca. 4 Reihen */
     opacity: 1;
     padding: 10px; /* Innenabstand, wenn ausgeklappt */
     /* border-top: 1px solid var(--card-border); */ /* Optional für klare Trennung */
 }
 
 
-/* In deiner styles.css Datei */
-
-.alphabet-button {
-    /* Bestehende Stile beibehalten oder anpassen */
-    padding: 10px 12px; /* Etwas kompakter für viele Buttons */
-    font-size: 1.2em;   /* GRÖSSERE Schrift */
-    min-width: 44px;    /* Mindestbreite, um sicherzustellen, dass auch schmale Buchstaben gut klickbar sind */
-    min-height: 44px;   /* Mindesthöhe */
-    display: inline-flex; 
+/* Stile für die Alphabet-Buttons INNERHALB des Wrappers (für Layout mit 7 Buttons) */
+#alphabetLettersWrapper .alphabet-button {
+    padding: 10px 0; /* Vertikales Padding, horizontales wird durch Breite gesteuert */
+    font-size: 1.2em;   /* Behält die größere Schrift bei */
+    min-height: 44px;   /* Mindesthöhe beibehalten */
+    display: inline-flex;
     justify-content: center;
     align-items: center;
-    /* margin: 3px; Entfernt, da gap im Wrapper verwendet wird */
-    border-radius: var(--border-radius-std, 6px); 
-    background-color: #f8f9fa; /* Heller Hintergrund für einzelne Buchstaben */
+    border-radius: var(--border-radius-std, 6px);
+    background-color: #f8f9fa;
     border: 1px solid var(--card-border);
-    color: var(--primary-color); /* Blaue Schrift für Klickbarkeit */
+    color: var(--primary-color);
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    box-sizing: border-box; /* WICHTIG für die Breitenberechnung */
+
+    /* Berechnung für 7 Buttons pro Zeile: (100% Containerbreite - Summe der Gaps) / Anzahl Buttons */
+    /* Bei 7 Buttons gibt es 6 Gaps zwischen ihnen. */
+    width: calc((100% - (6 * var(--alphabet-wrapper-gap))) / 7);
+    flex-grow: 0; /* Buttons sollen nicht wachsen, um die Breite beizubehalten */
+    flex-shrink: 0; /* Buttons sollen nicht schrumpfen, um die Breite beizubehalten */
+    min-width: 0; /* Entferne min-width, um die calc()-Breite zu erzwingen, oder setze es sehr niedrig */
+    text-align: center; /* Stellt sicher, dass der Buchstabe zentriert ist */
+}
+
+/* Allgemeine .alphabet-button Klasse (wird jetzt primär vom Toggle-Button #alphabetToggleAllButton genutzt) */
+/* Diese ursprüngliche .alphabet-button Definition wird weniger relevant für die Buchstaben-Buttons im Wrapper,
+   da diese spezifischer über #alphabetLettersWrapper .alphabet-button gestylt werden.
+   Sie kann aber als Fallback oder für andere Verwendungen von .alphabet-button dienen.
+   Der Toggle-Button selbst wird hauptsächlich über seine ID #alphabetToggleAllButton gestylt.
+*/
+.alphabet-button {
+    /* Diese Stile sind jetzt weniger kritisch für die Buchstaben-Buttons im Wrapper,
+       da sie spezifischer überschrieben werden. Wichtig für den Toggle-Button, falls er .alphabet-button auch nutzt. */
+    padding: 10px 12px;
+    font-size: 1em;
+    min-width: 40px;
+    min-height: 40px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: var(--border-radius-std, 6px);
+    background-color: #f8f9fa;
+    border: 1px solid var(--card-border);
+    color: var(--primary-color);
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-.alphabet-button:hover {
-    background-color: #e9ecef; /* Dunklerer Hover */
+/* Spezifische Stile für den Haupt-Toggle-Button (erbt ggf. von .alphabet-button und überschreibt) */
+#alphabetToggleAllButton {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 12px 15px;
+    font-size: 1em; /* Schriftgröße für "Alle" Text */
+    text-align: left;
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius-std);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    margin-bottom: 0; /* Kein Abstand zum Wrapper */
+    /* box-sizing: border-box; ist hier nicht kritisch, da width: 100% */
+}
+
+
+#alphabetToggleAllButton:hover {
+    background-color: #e9ecef;
+}
+
+#alphabetToggleAllButton.active {
+    /* Kann hier spezifischer gestylt werden, wenn "Alle" aktiv ist,
+       aber die primäre Aktiv-Anzeige ist der Text und die Buchstabenbuttons */
+    /* background-color: var(--primary-color); */
+    /* color: var(--text-on-primary); */
+    /* border-color: var(--primary-color); */
+}
+#alphabetToggleAllButton.active .expand-arrow {
+    /* color: var(--text-on-primary); */
+}
+
+
+#alphabetToggleAllButton .expand-arrow {
+    font-size: 24px;
+}
+
+/* Hover, Active, Focus Stile für die Buchstaben-Buttons im Wrapper */
+#alphabetLettersWrapper .alphabet-button:hover {
+    background-color: #e9ecef;
     border-color: #adb5bd;
 }
 
-.alphabet-button.active {
-    background-color: var(--primary-color); /* Blau für aktiven Button */
+#alphabetLettersWrapper .alphabet-button.active {
+    background-color: var(--primary-color);
     color: var(--text-on-primary);
     border-color: var(--secondary-color);
 }
 
-.alphabet-button:active {
+#alphabetLettersWrapper .alphabet-button:active {
      transform: scale(0.95);
 }
 /* === ENDE ALPHABET FILTER === */
