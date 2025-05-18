@@ -31,6 +31,9 @@
         <h2>Door Tracker</h2>
         <input type="email" id="loginEmail" placeholder="E-Mail-Adresse">
         <input type="password" id="loginPassword" placeholder="Passwort">
+        <div id="registrationCodeContainer" style="display: none; margin-top: 15px;">
+            <input type="text" id="registrationCode" placeholder="Registrierungscode (14-stellig)" maxlength="14" pattern="[a-zA-Z0-9]{14}" inputmode="text">
+        </div>
         <a href="/recovery/" id="resetText"><u>Passwort vergessen?</u></a>
         <div class="button-container">
             <button onclick="login()" class="loginbutton" id="login">Einloggen</button>

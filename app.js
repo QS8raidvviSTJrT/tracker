@@ -112,6 +112,9 @@ let workStartTime = null;
 // NEU: Referenzen für Login-Elemente
 const loginEmailInput = document.getElementById('loginEmail'); // E-Mail-Feld
 const loginPasswordInput = document.getElementById('loginPassword'); // Passwortfeld
+const registrationCodeContainer = document.getElementById('registrationCodeContainer'); // NEU
+const registrationCodeInput = document.getElementById('registrationCode'); // NEU
+const registerButton = document.getElementById('register'); // NEU: Referenz zum Register-Button
 
 // NEU: Referenzen für Skeleton Loader
 const statsViewSkeleton = document.querySelector('.stats-view-skeleton');
@@ -332,21 +335,97 @@ window.login = async function() {
         window.register = async function() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
+            const registrationCodeValue = registrationCodeInput.value.trim(); // Name geändert für Klarheit
     clearError();
+
+    // NEU: Angepasste Code-Validierung für 14 alphanumerische Zeichen
+    if (!/^[a-zA-Z0-9]{14}$/.test(registrationCodeValue)) {
+        showError('Bitte einen gültigen 14-stelligen alphanumerischen Registrierungscode eingeben.');
+        if (registrationCodeInput) registrationCodeInput.classList.add('error-input');
+        return;
+    }
+    if (registrationCodeInput) registrationCodeInput.classList.remove('error-input');
+
+    if (registerButton) {
+        registerButton.disabled = true;
+        registerButton.classList.add('loading');
+    }
+
+    let fetchedCodeId = null; // Variable, um die code_id zu speichern
+
     try {
-        const { error } = await supabaseClient.auth.signUp({ email, password });
-        if (error) throw error;
+        // 1. Prüfe den Registrierungscode via RPC
+        console.log("Versuche Registrierungscode zu prüfen via RPC:", registrationCodeValue);
+        const { data: validationResults, error: validationError } = await supabaseClient.rpc('validate_registration_code', {
+            p_code: registrationCodeValue
+        });
+
+        if (validationError) {
+            console.error('Supabase Fehler beim Aufrufen von validate_registration_code RPC:', validationError);
+            throw new Error('Fehler bei der Code-Prüfung. Versuche es später erneut.');
+        }
+
+        // Die RPC-Funktion gibt ein Array mit einem Objekt zurück
+        const result = validationResults && validationResults.length > 0 ? validationResults[0] : null;
+        console.log("Antwort von RPC validate_registration_code:", result);
+
+        if (!result || !result.is_valid) {
+            console.warn("Code nicht in der Datenbank gefunden (via RPC) für:", registrationCodeValue);
+            throw new Error('Ungültiger Registrierungscode.');
+        }
+
+        if (result.is_used) {
+            console.warn("Der Code", registrationCodeValue, "wurde bereits verwendet (via RPC).");
+            throw new Error('Dieser Registrierungscode wurde bereits verwendet.');
+        }
+
+        fetchedCodeId = result.code_id; // Speichere die ID des gültigen, unbenutzten Codes
+
+        // 2. Registriere den Benutzer
+        console.log("Code ist gültig und unbenutzt. Versuche Benutzer zu registrieren...");
+        const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({ email, password });
+        if (signUpError) {
+            console.error('Supabase Fehler bei auth.signUp:', signUpError);
+            throw signUpError;
+        }
+
+        console.log("Benutzer erfolgreich registriert:", signUpData.user.email, "User ID:", signUpData.user.id);
+
+        // 3. Markiere den Code als benutzt via RPC
+        if (!fetchedCodeId) {
+            // Sollte nicht passieren, wenn die Logik oben korrekt ist
+            console.error("KRITISCH: fetchedCodeId ist null, kann Code nicht als benutzt markieren.");
+            throw new Error("Interner Fehler: Code-ID nicht gefunden nach Validierung.");
+        }
+
+        console.log("Versuche Code als benutzt zu markieren via RPC für Code ID:", fetchedCodeId, "User ID:", signUpData.user.id);
+        const { error: claimError } = await supabaseClient.rpc('claim_registration_code', {
+            p_code_id: fetchedCodeId,
+            p_user_id: signUpData.user.id
+        });
+
+        if (claimError) {
+            // Dies ist ein kritischer Punkt. Der User wurde erstellt, aber der Code konnte nicht als benutzt markiert werden.
+            // Hier sollte Logging erfolgen und ggf. eine manuelle Korrektur.
+            console.error('KRITISCH: User erstellt, aber Code konnte nicht via RPC als "benutzt" markiert werden:', claimError);
+        } else {
+            console.log("Code erfolgreich als benutzt markiert via RPC.");
+        }
+
         alert('Registrierung erfolgreich! Bitte E-Mail-Adresse bestätigen und erneut einloggen.');
-        // Zurück zum Login-Interface
-        document.getElementById('register').classList.add('hidden');
-        document.getElementById('login').classList.remove('hidden');
-        const registerLink = document.getElementById('registerText');
-        if(registerLink) registerLink.style.display = 'block'; // Zeige "Neu hier?" wieder an
-        const existingAccountLink = document.querySelector('#loginContainer > div > a[href="/"]');
-         if (existingAccountLink) existingAccountLink.parentElement.remove(); // Entferne "Bereits ein Konto?"
+        showLoginInterface();
 
     } catch (error) {
+        console.error("Fehler im gesamten Registrierungsprozess:", error);
         showError('Registrierung fehlgeschlagen: ' + error.message);
+         if (error.message.toLowerCase().includes('code') || error.message.toLowerCase().includes('registrierungscode')) {
+            if (registrationCodeInput) registrationCodeInput.classList.add('error-input');
+        }
+    } finally {
+        if (registerButton) {
+            registerButton.disabled = false;
+            registerButton.classList.remove('loading');
+        }
     }
 };
 
@@ -367,6 +446,10 @@ window.registerNow = function() {
     document.getElementById('login').classList.add('hidden');
     const registerLink = document.getElementById('registerText');
     if (registerLink) registerLink.style.display = 'none';
+    document.getElementById('resetText').style.display = 'none'; // Passwort vergessen ausblenden
+    if (registrationCodeContainer) registrationCodeContainer.style.display = 'block'; // Code-Feld anzeigen
+    if (registrationCodeInput) registrationCodeInput.focus(); // Fokus auf Code-Feld
+
 
     // Füge Link hinzu, um zum Login zurückzukehren, falls nicht schon vorhanden
     if (!document.querySelector('#loginContainer > div > a[href="/"]')) {
@@ -375,7 +458,6 @@ window.registerNow = function() {
         loginLinkDiv.innerHTML = `<a href="#" onclick="showLoginInterface(); return false;" style="text-decoration: none; color: var(--text-color);">Du hast bereits ein Konto? <u>Anmelden</u></a>`;
         document.getElementById('loginContainer').appendChild(loginLinkDiv);
     }
-    document.getElementById('resetText').style.display = 'none'; // Passwort vergessen ausblenden
 };
 
 // Funktion, um von Registrieren zu Login zurückzuwechseln
@@ -384,9 +466,16 @@ window.showLoginInterface = function() {
     document.getElementById('login').classList.remove('hidden');
     const registerLink = document.getElementById('registerText');
     if (registerLink) registerLink.style.display = 'block';
-    const existingAccountLink = document.querySelector('#loginContainer > div > a[href="#"]');
-    if (existingAccountLink) existingAccountLink.parentElement.remove();
-     document.getElementById('resetText').style.display = 'block'; // Passwort vergessen einblenden
+    const existingAccountLink = document.querySelector('#loginContainer > div > a[href="#"]'); // Selektor angepasst
+    if (existingAccountLink && existingAccountLink.parentElement.innerText.includes("Du hast bereits ein Konto?")) { // Zusätzliche Prüfung
+        existingAccountLink.parentElement.remove();
+    }
+    document.getElementById('resetText').style.display = 'block'; // Passwort vergessen einblenden
+    if (registrationCodeContainer) registrationCodeContainer.style.display = 'none'; // Code-Feld ausblenden
+    if (registrationCodeInput) {
+        registrationCodeInput.value = ''; // Code-Feld leeren
+        registrationCodeInput.classList.remove('error-input'); // Fehlerklasse entfernen
+    }
 };
 
 
