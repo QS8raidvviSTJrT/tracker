@@ -1128,7 +1128,8 @@ body.nav-hidden .nav-fab {
 /* --- STATISTIK VIEW --- */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Responsive Grid */
+    /* Direkt zwei Spalten definieren */
+    grid-template-columns: repeat(2, 1fr); 
     gap: 15px;
     margin-top: 15px;
 }
@@ -1140,6 +1141,11 @@ body.nav-hidden .nav-fab {
     text-align: center;
     border: 1px solid var(--card-border);
     box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Spezifisches Styling für das erste Item ("Klingeln gesamt") */
+.stats-grid .stat-item:nth-child(1) {
+    grid-column: 1 / -1; /* Nimmt die volle Breite des Grids (beide Spalten) ein */
 }
 
 .stat-value {
@@ -1509,13 +1515,20 @@ body.nav-hidden .nav-fab {
 /* Stats View Skeleton */
 .stats-view-skeleton .stats-grid-skeleton {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(2, 1fr); /* Zwei Spalten Layout */
     gap: 15px;
     margin-top: 15px;
 }
 .stats-view-skeleton .skeleton-stat-item {
     height: 80px; /* Höhe der Stat-Kacheln */
+    border-radius: var(--border-radius-std); /* Sicherstellen, dass Skeleton-Items auch den Radius haben */
 }
+
+/* Spezifisches Styling für das erste Skeleton-Item, das die volle Breite einnimmt */
+.stats-view-skeleton .stats-grid-skeleton .full-width-skeleton-item {
+    grid-column: 1 / -1; /* Nimmt die volle Breite des Grids (beide Spalten) ein */
+}
+
 .stats-view-skeleton .skeleton-chart-container {
     height: 250px; /* Höhe des Chart-Bereichs */
     width: 100%;
