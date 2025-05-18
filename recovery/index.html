@@ -14,123 +14,159 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
-    --primary-color: #131313;
-    --background-color: #131313;
-    --card-background: #1A1A1A;
-    --text-color: #E8E8E8;
-    --success-color: #34C759;
-    --danger-color: #FF3B30;
-}
+            /* Farbschema von styles.css */
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --accent-color: #0284c7;
+            --text-color: #1e293b;
+            --bg-color: #ffffff;
+            --card-bg: #f8fafc;
+            --card-border: #e2e8f0;
+            --text-on-primary: #ffffff;
+            --danger-color: #dc2626;
+            --success-color: #16a34a;
+            --border-radius-std: 8px;
+            --border-radius-large: 12px;
+        }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        }
 
-body {
-    background-color: var(--background-color);
-    min-height: 100vh;
-    padding: 20px;
-    touch-action: pan-x pan-y;
-    color: var(--text-color);
-}
+        body {
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            padding: 20px;
+            touch-action: pan-x pan-y;
+            color: var(--text-color);
+            display: flex; /* Zentrierung des Inhalts */
+            align-items: center; /* Zentrierung des Inhalts */
+            justify-content: center; /* Zentrierung des Inhalts */
+        }
 
-        .container {
+        .login-container { /* Angepasst von .container zu .login-container */
             max-width: 400px;
-    margin: auto;
-    padding: 30px;
-    background: var(--card-background);
-    border-radius: 20px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-    text-align: center;
+            margin: 40px auto;
+            padding: 30px;
+            background: var(--card-bg);
+            border-radius: var(--border-radius-large);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            text-align: center;
         }
 
         h1 {
             color: var(--text-color);
+            margin-bottom: 1rem; /* Etwas weniger als 1.5rem für kompakteres Aussehen */
+            font-size: 1.5em; /* Etwas kleiner für Login-Kontext */
+        }
+        p {
             margin-bottom: 1.5rem;
-            text-align: center;
+            font-size: 0.95em;
+            color: var(--text-color);
         }
 
         .form-group {
             margin-bottom: 1rem;
-            margin-top: 1rem;
         }
 
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--text-color);
-        }
+        /* label nicht mehr explizit benötigt, da Placeholder verwendet wird */
 
-        input {
+        input[type="email"] { /* Stile von styles.css übernommen */
             width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius-std);
             font-size: 1rem;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
-        button {
+        input[type="email"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
+
+        button { /* Stile von styles.css für primäre Buttons */
             width: 100%;
-            padding: 0.75rem;
-            background-color: #4CAF50;
-            color: white;
+            padding: 12px 20px;
+            background-color: var(--primary-color);
+            color: var(--text-on-primary);
             border: none;
-            border-radius: 4px;
+            border-radius: var(--border-radius-std);
             font-size: 1rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            margin-bottom: 10px; /* Abstand zum nächsten Button */
         }
 
-        .back {
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .back-button { /* Eigene Klasse für den Zurück-Button, gestylt als sekundärer Button */
             width: 100%;
-            padding: 0.75rem;
-            background-color: transparent;
-            color: white;
-            margin-top: 1rem;
-            border: 2px solid #000000;
-            border-radius: 4px;
+            padding: 12px 20px;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--card-border);
+            border-radius: var(--border-radius-std);
             font-size: 1rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: background-color 0.2s;
+            text-decoration: none;
+            display: block; /* Damit er die volle Breite einnimmt */
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .back-button:hover {
+            background-color: #e9ecef; /* Hellerer Hover für sekundäre Buttons */
+            border-color: #adb5bd;
         }
 
-        .back a {
-            text-decoration: none;
-            color: var(--text-color);
-        }
 
         .message {
             margin-top: 1rem;
-            padding: 0.75rem;
-            border-radius: 4px;
+            padding: 12px 15px; /* Angepasst an Input-Padding */
+            border-radius: var(--border-radius-std);
             text-align: center;
+            font-size: 0.9em;
         }
 
         .success {
-            background-color: #dff0d8;
-            color: #3c763d;
+            background-color: #d1fae5; /* Helleres Grün für Erfolg (Tailwind green-100) */
+            color: var(--success-color); /* Dunkelgrüner Text (wie in styles.css) */
+            border: 1px solid #a7f3d0; /* Passender Rand (Tailwind green-200) */
         }
 
         .error {
-            background-color: #f2dede;
-            color: #a94442;
+            background-color: #fee2e2; /* Helleres Rot für Fehler (Tailwind red-100) */
+            color: var(--danger-color); /* Dunkelroter Text (wie in styles.css) */
+            border: 1px solid #fecaca; /* Passender Rand (Tailwind red-200) */
         }
 
     </style>
 </head>
 <body>
     <!-- Email Request Page -->
-    <div id="requestPage" class="container page">
-        <h1>Du hast dein Passwort vergessen?</h1>
+    <div id="requestPage" class="login-container page">
+        <h1>Passwort vergessen?</h1>
         <p>Wir schicken dir einen Link, mit welchem du dein Passwort zurücksetzen kannst.</p>
         <div class="form-group">
             <input type="email" id="email" required placeholder="E-Mail-Adresse">
         </div>
         <button onclick="requestReset()">Link anfordern</button>
-        <a href="/"><button class="back">Zurück zur Anmeldung</button></a>
+        <a href="/" class="back-button">Zurück zur Anmeldung</a>
         <div id="requestMessage" class="message" style="display: none;"></div>
     </div>
 

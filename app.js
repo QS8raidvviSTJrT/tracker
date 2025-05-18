@@ -803,7 +803,7 @@ function renderStreetDetailView(streetName) {
         <h5>${streetName}</h5>
         <div style="display: flex; gap: 10px; margin-bottom: 12px;">
             <input type="text" id="houseNumberInput" placeholder="Hausnummer" required inputmode="numeric" style="flex-grow: 1; ${inputStyle}">
-            <input type="text" id="nameInput" placeholder="Name" style="flex-grow: 1; ${inputStyle}">
+            <input type="text" id="nameInput" placeholder="Name von der Tür" style="flex-grow: 1; ${inputStyle}">
         </div>
         <select id="statusSelect" style="width: 100%; margin-bottom: 12px; ${inputStyle}">
             <option value="">-- Status --</option>
@@ -1017,51 +1017,33 @@ async function saveOrUpdateHouseEntry() {
     try {
         let result;
         if (currentEditingEntryId) {
-            // Update: Jeder darf aktualisieren. creator_id wird NICHT geändert.
+            // Update: Bestehender Eintrag wird bearbeitet.
             console.log(`Aktualisiere Eintrag ${currentEditingEntryId}`);
             const { data, error } = await supabaseClient
                 .from('house_entries')
-                .update(entryDataForUpdate) // Nur die relevanten Felder für Update
+                .update(entryDataForUpdate)
                 .eq('id', currentEditingEntryId);
              if (error) throw error;
              result = data;
         } else {
-            // Prüfen ob Eintrag für Hausnummer schon existiert (global für die Straße)
-            const { data: existing, error: checkError } = await supabaseClient
+            // Insert: Neuer Eintrag wird erstellt.
+            // Die Prüfung auf einen existierenden Eintrag für dieselbe Hausnummer wird entfernt,
+            // um mehrere Einträge pro Hausnummer zu ermöglichen.
+            console.log(`Füge neuen Eintrag hinzu für Hausnummer ${houseNumber}`);
+            const entryDataForInsert = {
+                ...entryDataForUpdate, // Übernimmt alle Felder von oben
+                creator_id: currentUser.id // Setzt den ursprünglichen Ersteller
+            };
+            const { data, error } = await supabaseClient
                 .from('house_entries')
-                .select('id, creator_id') // Lade ggf. creator_id, falls benötigt für Logik
-                .eq('street_id', currentSelectedStreetId)
-                .eq('house_number', houseNumber)
-                .maybeSingle();
-
-            if (checkError) throw checkError;
-
-            if (existing) {
-                // Eintrag existiert, stattdessen aktualisieren.
-                // creator_id wird NICHT geändert.
-                console.log(`Eintrag für Hausnummer ${houseNumber} existiert, aktualisiere stattdessen.`);
-                const { data, error } = await supabaseClient
-                    .from('house_entries')
-                    .update(entryDataForUpdate) // Nur die relevanten Felder für Update
-                    .eq('id', existing.id);
-                if (error) throw error;
-                result = data;
-            } else {
-                // Insert: Neuer Eintrag wird mit user_id und creator_id des aktuellen Users erstellt
-                console.log(`Füge neuen Eintrag hinzu für Hausnummer ${houseNumber}`);
-                const entryDataForInsert = {
-                    ...entryDataForUpdate, // Übernimmt alle Felder von oben
-                    creator_id: currentUser.id // Setzt den ursprünglichen Ersteller
-                };
-                const { data, error } = await supabaseClient
-                    .from('house_entries')
-                    .insert(entryDataForInsert);
-                if (error) throw error;
-                result = data;
-            }
+                .insert(entryDataForInsert)
+                .select() // .select() hinzugefügt, um das eingefügte Objekt zurückzugeben, falls benötigt
+                .single(); // .single() hinzugefügt, da wir ein einzelnes Objekt erwarten
+            if (error) throw error;
+            result = data;
         }
 
-        console.log("Eintrag erfolgreich gespeichert/aktualisiert.");
+        console.log("Eintrag erfolgreich gespeichert/aktualisiert.", result);
 
         // Kurze Vibration, falls unterstützt
         if (navigator.vibrate) {
@@ -1163,10 +1145,12 @@ async function deleteHouseEntry(entryId) {
 // Leert das Eingabeformular und den Bearbeitungsstatus
 function clearHouseEntryForm() {
     const houseNumberInput = document.getElementById('houseNumberInput');
+    const nameInput = document.getElementById('nameInput'); // NEU: Referenz zum Namensfeld
     const statusSelect = document.getElementById('statusSelect');
     const notesInput = document.getElementById('notesInput');
 
     if(houseNumberInput) houseNumberInput.value = '';
+    if(nameInput) nameInput.value = ''; // NEU: Namensfeld leeren
     if(statusSelect) statusSelect.value = '';
     if(notesInput) notesInput.value = '';
 
