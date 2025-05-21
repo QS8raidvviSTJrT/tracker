@@ -1341,6 +1341,48 @@ body.nav-hidden .nav-fab {
     margin-right: 8px;
 }
 
+/* NEU: Stile für Versionshistorie */
+#versionHistoryContainer {
+    margin-top: 20px; /* Abstand zur vorherigen Trennlinie */
+    padding-top: 15px; /* Innenabstand oben, falls noch eine subtile Linie gewünscht wäre */
+    /* border-top: 1px solid var(--card-border); */ /* Optionale Trennlinie, falls gewünscht */
+}
+
+#versionHistoryContainer h3 {
+    font-size: 1.1em; /* Etwas kleinere Überschrift als "Einstellungen" */
+    color: var(--text-color);
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+#versionHistoryContainer p,
+#versionHistoryContainer ul {
+    font-size: 0.9em;
+    color: var(--text-color-muted, #475569); /* Gedämpftere Farbe für Details */
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+#versionHistoryContainer p strong {
+    color: var(--text-color); /* Wichtige Teile (Version) hervorheben */
+    font-weight: 500;
+}
+
+#versionHistoryContainer ul {
+    list-style-position: outside;
+    padding-left: 20px; /* Einrückung für die Liste */
+}
+
+#versionHistoryContainer ul li {
+    margin-bottom: 5px;
+}
+
+#versionHistoryContainer p[style*="font-size: 0.8em"] { /* Spezifisch für App-Version Info */
+    margin-top: 20px; /* Mehr Abstand nach oben */
+    font-style: italic;
+}
+/* ENDE: Stile für Versionshistorie */
+
 /* --- ZEITERFASSUNG (CALENDAR VIEW) --- */
 #calendarView .content-card {
     margin-bottom: 20px;
