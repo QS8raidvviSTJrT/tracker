@@ -388,6 +388,9 @@ input.error-input {
     position: static; /* Nicht mehr absolut */
     box-shadow: none; /* Kein Schatten */
     border: 1px solid transparent; /* Platzhalter für Rand im Hover */
+    display: inline-flex; /* Wichtig für Icon-Zentrierung */
+    align-items: center;
+    justify-content: center;
 }
 .app-header #searchStreetButton span.material-icons {
     font-size: 24px; /* Passende Icon-Größe */
@@ -399,6 +402,56 @@ input.error-input {
 }
 .app-header #searchStreetButton:active {
     transform: scale(0.95); /* Stärkerer Klick-Effekt */
+}
+
+/* NEU: Stile für den Locate Me Button im Header */
+.app-header #locateMeButton {
+    background-color: transparent;
+    color: var(--primary-color); /* Oder eine andere Akzentfarbe, falls gewünscht */
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: static;
+    box-shadow: none;
+    border: 1px solid transparent;
+    display: inline-flex; /* Wichtig für Icon-Zentrierung */
+    align-items: center;
+    justify-content: center;
+    cursor: pointer; /* Zeiger für Klickbarkeit */
+}
+
+.app-header #locateMeButton span.material-icons {
+    font-size: 24px;
+    margin: 0;
+    transition: transform 0.5s linear; /* Für sanftere Drehung, falls spin-Klasse genutzt wird */
+}
+
+/* Stellt sicher, dass das Icon sich dreht und nicht der ganze Button, wenn .spin aktiv ist */
+.app-header #locateMeButton span.material-icons.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Optional: Deaktivierter Zustand explizit stylen, falls nötig */
+.app-header #locateMeButton:disabled {
+    /* Standard-Browser-Stile für disabled könnten greifen.
+       Wenn das Icon auch bei disabled sichtbar bleiben soll (nur nicht klickbar),
+       könnte man hier color und cursor anpassen.
+       Wenn die spin-Animation auch im disabled Zustand laufen soll, ist das okay.
+       Andernfalls müsste man die .spin-Klasse entfernen, wenn disabled.
+       Die JS-Logik entfernt .spin im finally-Block, was gut ist. */
+    cursor: default;
+    /* color: #a0aec0; */ /* Beispiel: Gedämpfte Farbe für disabled Icon */
+}
+
+
+.app-header #locateMeButton:hover:not(:disabled) {
+    background-color: #eef2ff; /* Heller blauer Hintergrund im Hover */
+    border-color: #dbeafe; /* Heller Rand im Hover */
+}
+.app-header #locateMeButton:active:not(:disabled) {
+    transform: scale(0.95);
 }
 
 /* Logout Button bleibt fast gleich, evtl. Hover anpassen */
@@ -1668,5 +1721,52 @@ body.nav-hidden .nav-fab {
     margin-bottom: 0; /* Kein extra margin-bottom für Skeleton-Text hier */
 }
 
+/* Anpassung für "Zuletzt geöffnet"-Button */
+.last-opened-street-button {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 15px; /* Konsistentes Padding */
+  margin-bottom: 10px; /* Abstand zur Straßenliste oder Placeholder */
+  background-color: var(--card-bg); /* Hintergrund wie andere UI-Karten/Elemente */
+  border: 1px solid var(--card-border); /* Passender Rand */
+  border-radius: var(--border-radius-std); /* Standard Eckenradius */
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.95em; /* Ähnlich wie street-item */
+  color: var(--text-color);
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Dezenter Schatten für Abhebung */
+}
+
+.last-opened-street-button:hover {
+  background-color: #eef2ff; /* Heller blauer Hover, ähnlich street-item */
+  border-color: var(--primary-color-light, #a5b4fc); /* Optional: Rand im Hover leicht anpassen */
+}
+
+.last-opened-street-button .last-opened-prefix {
+  font-weight: normal;
+  color: var(--text-color-muted); /* Gedämpfte Farbe für den Präfix */
+  font-size: 0.9em; /* Etwas kleiner als der Name */
+  margin-right: 6px;
+}
+
+.last-opened-street-button .last-opened-name {
+  font-weight: 500; /* Straßennamen etwas hervorheben */
+}
+
+
+/* Optional, um den Text im Button besser zu formatieren, falls du <spans> verwendest */
+/* .last-opened-street-button span {
+  vertical-align: middle; // Ist durch Flexbox oder Block-Elemente meist schon gut
+} */
 
 /* ... restliche Stile ... */
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

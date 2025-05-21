@@ -5,6 +5,7 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
         // NEU: LocalStorage Keys
         const LS_STREET_CACHE_KEY = 'doorTrackerStreetCache';
         const LS_ACTIVE_STREET_DETAIL_KEY = 'doorTrackerActiveStreetDetail';
+        const LS_LAST_OPENED_STREET_KEY = 'doorTrackerLastOpenedStreet'; // NEU
 
         // NEU: LocalStorage Helper Functions
         function saveToLocalStorage(key, data) {
@@ -91,6 +92,7 @@ const settingsStatus = document.getElementById('settingsStatus');
 
 const streetListPlaceholder = document.getElementById('streetListPlaceholder'); // Referenz zum Platzhalter
 const alphabetFilterContainer = document.getElementById('alphabetFilterContainer'); // NEU
+let lastOpenedStreetElementContainer = null; // NEU: Globale Referenz für "Zuletzt geöffnet"
 
 // NEU: Referenzen für Kalender-View-Elemente (Zeiterfassung)
 const calendarView = document.getElementById('calendarView'); // Ist schon da
@@ -481,6 +483,78 @@ window.showLoginInterface = function() {
 
 
 // --- Standort & PLZ ---
+
+// NEUE Funktion für den "Locate Me" Button
+window.locateMe = async function() {
+    const locateButton = document.getElementById('locateMeButton');
+
+
+    if (!navigator.geolocation) {
+        showError("Standortdienste werden von Ihrem Browser nicht unterstützt oder sind blockiert.");
+        if (locateButton) {
+            locateButton.disabled = false;
+            const icon = locateButton.querySelector('.material-icons');
+            if (icon) icon.classList.remove('spin');
+        }
+        return;
+    }
+
+    clearError();
+
+
+
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true, // Fordere höhere Genauigkeit an
+                timeout: 10000,         // 10 Sekunden Timeout
+                maximumAge: 60000         // Akzeptiere gecachte Position bis zu 1 Minute alt
+            });
+        });
+
+        const { latitude, longitude } = position.coords;
+        // if (loadingIndicator) loadingIndicator.textContent = "Ermittle PLZ...";
+
+        const postalCode = await reverseGeocode(latitude, longitude);
+        if (postalCode) {
+            plzInput.value = postalCode;
+            // searchStreets() wird nun die Straßen laden und den loadingIndicator selbst ausblenden
+            await searchStreets(); // Warten bis searchStreets fertig ist, um loadingIndicator korrekt zu behandeln
+        } else {
+            showError("PLZ konnte für Ihren Standort nicht ermittelt werden.");
+        }
+    } catch (error) {
+        console.warn("Fehler bei der Standortabfrage oder PLZ-Ermittlung:", error);
+        let errorMessage = "Standort konnte nicht abgerufen werden.";
+        if (error.code) {
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = "Zugriff auf Standort verweigert.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = "Standortinformationen sind nicht verfügbar.";
+                    break;
+                case error.TIMEOUT:
+                    errorMessage = "Timeout bei der Standortabfrage.";
+                    break;
+            }
+        } else if (error.message.includes("Nominatim")) {
+            errorMessage = "PLZ konnte nicht ermittelt werden (Nominatim Fehler).";
+        }
+        showError(errorMessage);
+    } finally {
+        if (locateButton) {
+            locateButton.disabled = false;
+            const icon = locateButton.querySelector('.material-icons');
+            if (icon) icon.classList.remove('spin');
+        }
+
+        // Falls searchStreets() erfolgreich war, wird der Indikator dort schon ausgeblendet.
+        // Falls nicht, aber eine PLZ gefunden wurde, könnte er noch an sein.
+        // Die Logik in searchStreets() sollte das aber abdecken.
+    }
+}
+
 async function getPostalCodeFromLocation() {
     if (!navigator.geolocation) return;
     // loadingIndicator.textContent = "Ermittle Standort..."; // ENTFERNT
@@ -499,17 +573,36 @@ async function getPostalCodeFromLocation() {
                 }
             } catch (error) {
                 console.warn("Fehler beim Reverse Geocoding:", error);
+                // Fehler wird von reverseGeocode schon geloggt, hier evtl. User-Feedback?
+                showError("PLZ konnte für Ihren Standort nicht ermittelt werden.");
             } finally {
-                loadingIndicator.style.display = 'none';
-                // loadingIndicator.textContent = "Lade Straßen..."; // ENTFERNT
+                // loadingIndicator wird von searchStreets() ausgeblendet oder hier, falls keine PLZ gefunden
+                if (loadingIndicator.style.display === 'block' && !plzInput.value) {
+                     loadingIndicator.style.display = 'none';
+                }
             }
         },
         (error) => {
             console.warn("Standortabfrage fehlgeschlagen:", error.message);
+            let errorMessage = "Standort konnte nicht abgerufen werden.";
+             if (error.code) {
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = "Zugriff auf Standort verweigert.";
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = "Standortinformationen sind nicht verfügbar.";
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = "Timeout bei der Standortabfrage.";
+                        break;
+                }
+            }
+            showError(errorMessage);
             loadingIndicator.style.display = 'none';
             // loadingIndicator.textContent = "Lade Straßen..."; // ENTFERNT
         },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 } // enableHighAccuracy auf true
     );
 }
 
@@ -539,11 +632,26 @@ async function searchStreets() {
     }
 
     clearError();
-    // Wichtig: Wenn eine neue Suche gestartet wird, ist eine eventuell offene Detailansicht nicht mehr relevant.
     removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY);
     if (streetDetailContainer) streetDetailContainer.style.display = 'none';
     if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none';
-    if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; // Alphabet Filter auch ausblenden
+    // if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; // Wird in displayStreets gehandhabt
+
+    // Bestehende UI-Elemente für Straßenliste und Filter zurücksetzen/entfernen
+    if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
+    streetListContainer.innerHTML = '';
+    streetListContainer.style.display = 'none';
+
+    // "Zuletzt geöffnet"-Element entfernen, falls vorhanden
+    if (lastOpenedStreetElementContainer && lastOpenedStreetElementContainer.parentNode) {
+        lastOpenedStreetElementContainer.parentNode.removeChild(lastOpenedStreetElementContainer);
+        lastOpenedStreetElementContainer = null;
+    }
+    // Alphabet-Filter ausblenden (wird in displayStreets bei Bedarf neu aufgebaut/angezeigt)
+    if (alphabetFilterContainer) {
+        alphabetFilterContainer.style.display = 'none';
+        alphabetFilterContainer.innerHTML = ''; // Leeren für sauberen Neuaufbau
+    }
 
     // Prüfen, ob Straßen für diese PLZ im Cache sind
     const cachedData = getFromLocalStorage(LS_STREET_CACHE_KEY);
@@ -644,14 +752,52 @@ async function fetchStreetsWithOverpass(url, query) {
 
 
 function displayStreets(streets, postalCode) {
-    streetListContainer.innerHTML = ''; // Leert alles
+    streetListContainer.innerHTML = ''; // Leert die eigentliche Straßenliste
+    const parent = streetListContainer.parentNode;
+
+    // 1. Alphabet-Filter vorbereiten/anzeigen
+    if (alphabetFilterContainer) {
+        alphabetFilterContainer.innerHTML = ''; 
+        alphabetFilterContainer.style.display = 'none'; 
+    }
 
     if (streets.length > 0) {
-        // === NEU: Alphabet-Filter rendern und anzeigen ===
-        renderAlphabetFilter();
-        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'flex'; // Als Flex anzeigen
-        // === ENDE NEU ===
+        renderAlphabetFilter(); 
+        if (alphabetFilterContainer) alphabetFilterContainer.style.display = 'flex'; 
+    }
 
+    // 2. "Zuletzt geöffnet" Element verwalten
+    const lastOpenedStreetData = getFromLocalStorage(LS_LAST_OPENED_STREET_KEY);
+
+    if (lastOpenedStreetElementContainer && lastOpenedStreetElementContainer.parentNode === parent) {
+        parent.removeChild(lastOpenedStreetElementContainer);
+        lastOpenedStreetElementContainer = null; 
+    }
+
+    if (lastOpenedStreetData && lastOpenedStreetData.postalCode === postalCode) {
+        lastOpenedStreetElementContainer = document.createElement('div');
+        lastOpenedStreetElementContainer.className = 'last-opened-street-button'; // Neue CSS-Klasse verwenden
+        
+        const streetNameDisplay = lastOpenedStreetData.streetName.length > 35 
+            ? escapeHtml(lastOpenedStreetData.streetName.substring(0, 32)) + "..." 
+            : escapeHtml(lastOpenedStreetData.streetName);
+        
+        // HTML-Struktur für besseres Styling mit Präfix und Name
+        lastOpenedStreetElementContainer.innerHTML = 
+            `<span class="last-opened-prefix">Zuletzt:</span>` +
+            `<span class="last-opened-name">${streetNameDisplay}</span>`;
+        
+        lastOpenedStreetElementContainer.title = `Gehe zu: ${escapeHtml(lastOpenedStreetData.streetName)}`;
+        
+        lastOpenedStreetElementContainer.onclick = () => selectStreet(lastOpenedStreetData.streetName, lastOpenedStreetData.postalCode);
+
+        if (parent) {
+            parent.insertBefore(lastOpenedStreetElementContainer, streetListContainer);
+        }
+    }
+
+    // 3. Straßen in die Liste füllen
+    if (streets.length > 0) {
          streets.forEach(streetName => {
             const streetElement = document.createElement('div');
             streetElement.textContent = streetName;
@@ -659,14 +805,22 @@ function displayStreets(streets, postalCode) {
             streetElement.onclick = () => selectStreet(streetName, postalCode);
             streetListContainer.appendChild(streetElement);
          });
+         // Nach dem Füllen der Liste den Alphabet-Filter ggf. neu initialisieren/filtern
+         // Dies stellt sicher, dass der Filter auf die frisch geladene Liste angewendet wird.
+         if (currentAlphabetFilter) { // currentAlphabetFilter wird in renderAlphabetFilter ggf. auf 'Alle' gesetzt
+             filterStreetsByLetter(currentAlphabetFilter);
+         } else {
+             filterStreetsByLetter('Alle'); // Fallback, sollte durch renderAlphabetFilter abgedeckt sein
+         }
     } else {
-        // === NEU: Alphabet-Filter ausblenden ===
-        if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
-        // === ENDE NEU ===
-        streetListContainer.innerHTML = '<p style="text-align: center; padding: 20px;">Keine Straßen für diese PLZ gefunden.</p>';
+        // `streetListContainer` ist bereits leer.
+        // Die Nachricht "Keine Straßen für diese PLZ gefunden" wird nur angezeigt,
+        // wenn auch das "Zuletzt geöffnet"-Element nicht da ist.
+        if (!lastOpenedStreetElementContainer && streetListContainer.children.length === 0) {
+            streetListContainer.innerHTML = '<p style="text-align: center; padding: 20px;">Keine Straßen für diese PLZ gefunden.</p>';
+        }
     }
-
-    streetListContainer.style.display = 'flex'; // Container wieder anzeigen
+    streetListContainer.style.display = 'flex';
 }
 
 // --- Hausnummern-Verwaltung ---
@@ -674,6 +828,20 @@ function displayStreets(streets, postalCode) {
 async function selectStreet(streetName, postalCode) {
     console.log(`Ausgewählte Straße: ${streetName}, PLZ: ${postalCode}`);
     clearError();
+
+    // Bestehende Logik zum Entfernen des "Zuletzt geöffnet"-Buttons, falls dieser geklickt wurde.
+    // Diese kann bestehen bleiben, da sie spezifisch den Fall behandelt, dass der Button selbst geklickt wird
+    // und lastOpenedStreetElementContainer korrekt auf null setzt.
+    const lastOpenedStreetDataForRemoval = getFromLocalStorage(LS_LAST_OPENED_STREET_KEY);
+    if (lastOpenedStreetElementContainer &&
+        lastOpenedStreetDataForRemoval &&
+        lastOpenedStreetDataForRemoval.streetName === streetName &&
+        lastOpenedStreetDataForRemoval.postalCode === postalCode) {
+        if (lastOpenedStreetElementContainer.parentNode) {
+            lastOpenedStreetElementContainer.parentNode.removeChild(lastOpenedStreetElementContainer);
+        }
+        lastOpenedStreetElementContainer = null; 
+    }
 
     // Echten Inhaltscontainer ausblenden und leeren
     if (streetDetailContainer) {
@@ -687,9 +855,16 @@ async function selectStreet(streetName, postalCode) {
     if (streetListContainer) streetListContainer.style.display = 'none';
     if (alphabetFilterContainer) {
         alphabetFilterContainer.style.display = 'none'; // Alphabet-Filter ausblenden
-        // Reset alphabet filter state when going to street detail
-        // isAlphabetFilterExpanded = false; // Wird in backToStreetList() korrekt behandelt
-        // alphabetFilterContainer.classList.remove('expanded');
+    }
+    
+    // NEU: "Zuletzt geöffnet"-Button IMMER entfernen, wenn in die Detailansicht gewechselt wird.
+    // displayStreets() wird ihn bei Bedarf neu erstellen, wenn zur Liste zurückgekehrt wird.
+    if (lastOpenedStreetElementContainer && lastOpenedStreetElementContainer.parentNode) {
+        lastOpenedStreetElementContainer.parentNode.removeChild(lastOpenedStreetElementContainer);
+        // Wichtig: Setze die globale Referenz auch hier auf null, damit sie nicht
+        // fälschlicherweise in anderen Kontexten als noch existent betrachtet wird,
+        // bis displayStreets sie ggf. neu erstellt.
+        lastOpenedStreetElementContainer = null;
     }
     
     currentSortOrder = getFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY)?.sortOrder || 'house_number_asc'; // Sortierung ggf. aus Cache wiederherstellen
@@ -704,7 +879,10 @@ async function selectStreet(streetName, postalCode) {
             .eq('postal_code', postalCode)
             .maybeSingle();
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+            console.error("Supabase fetchError (streets select):", JSON.stringify(fetchError, null, 2));
+            throw fetchError;
+        }
 
         if (existingStreet) {
             currentSelectedStreetId = existingStreet.id;
@@ -720,7 +898,10 @@ async function selectStreet(streetName, postalCode) {
                 .select('id')
                 .single();
 
-            if (insertError) throw insertError;
+            if (insertError) {
+                console.error("Supabase insertError (streets insert):", JSON.stringify(insertError, null, 2));
+                throw insertError;
+            }
             currentSelectedStreetId = newStreet.id;
             console.log(`Straße "${streetName}" (${postalCode}) mit ID ${currentSelectedStreetId} global neu angelegt.`);
         }
@@ -735,7 +916,10 @@ async function selectStreet(streetName, postalCode) {
         if (streetDetailContainer) streetDetailContainer.style.display = 'block'; 
         if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; 
 
-        // NEU: Aktive Detailansicht im localStorage speichern
+        // NEU: Zuletzt geöffnete Straße speichern (unabhängig von der Detailansicht)
+        saveToLocalStorage(LS_LAST_OPENED_STREET_KEY, { streetName, postalCode });
+
+        // Aktive Detailansicht im localStorage speichern
         saveToLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY, {
             streetId: currentSelectedStreetId,
             streetName: streetName,
@@ -745,7 +929,25 @@ async function selectStreet(streetName, postalCode) {
 
     } catch (error) {
         console.error('Fehler beim Auswählen/Anlegen der Straße oder Laden der Einträge:', error);
-        showError(`Ein Fehler ist aufgetreten: ${error.message}`);
+        let userMessage = `Ein Fehler ist aufgetreten: ${error.message}`;
+        // Versuche, spezifischere Informationen aus dem Supabase-Fehlerobjekt zu extrahieren
+        const supabaseErrorDetails = error.details || (error.error && error.error.message) || '';
+        const supabaseErrorCode = error.code || (error.error && error.error.code) || '';
+
+        if (error.status === 400 || (error.message && error.message.includes("400"))) {
+            userMessage = `Fehlerhafte Anfrage (400) beim Laden der Straßendetails. Details: ${supabaseErrorDetails || error.message}. Code: ${supabaseErrorCode}. Bitte prüfen Sie die Eingaben oder versuchen Sie es später erneut.`;
+            console.error('Detailliertes Fehlerobjekt (400):', JSON.stringify(error, null, 2));
+        } else if (error.status === 401 || error.status === 403 || (error.message && (error.message.includes("401") || error.message.includes("403")))) {
+            userMessage = `Sitzung möglicherweise abgelaufen oder keine Berechtigung (${error.status || 'N/A'}). Details: ${supabaseErrorDetails || error.message}. Bitte neu laden oder einloggen.`;
+            // Erwägen, checkSession() aufzurufen, aber Vorsicht vor Endlosschleifen.
+            // checkSession();
+        } else {
+            // Allgemeiner Fehler
+             userMessage = `Ein Fehler ist aufgetreten (${error.status || 'N/A'}): ${supabaseErrorDetails || error.message}. Code: ${supabaseErrorCode}.`;
+        }
+
+
+        showError(userMessage);
         if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; // Skeleton bei Fehler ausblenden
         backToStreetList(); // Im Fehlerfall zurück zur Liste
     } finally {
@@ -762,12 +964,19 @@ async function loadHouseEntries(streetId) {
             .eq('street_id', streetId)
             .order('house_number', { ascending: true }); // Nach Hausnummer sortieren
 
-        if (error) throw error;
+        if (error) {
+            console.error("Supabase error (loadHouseEntries):", JSON.stringify(error, null, 2));
+            throw error;
+        }
         currentHouseEntries = data || [];
         console.log(`${currentHouseEntries.length} Hausnummern-Einträge geladen für Street ID ${streetId}`);
     } catch (error) {
         console.error('Fehler beim Laden der Hausnummern:', error);
-        showError(`Fehler beim Laden der Hausnummern: ${error.message}`);
+        let userMessage = `Fehler beim Laden der Hausnummern: ${error.message}`;
+        if (error.status === 400) {
+            userMessage = `Fehlerhafte Anfrage (400) beim Laden der Hausnummern. Details: ${error.details || error.message}.`;
+        }
+        showError(userMessage);
         currentHouseEntries = []; // Im Fehlerfall leeren
     }
 }
@@ -1172,15 +1381,20 @@ function backToStreetList() {
     
     removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY); 
 
-    // Alphabet-Filter Zustand zurücksetzen und ggf. neu rendern/anzeigen
-    isAlphabetFilterExpanded = false; // Standardmäßig einklappen
+    // "Zuletzt geöffnet"-Element entfernen, falls vorhanden
+    if (lastOpenedStreetElementContainer && lastOpenedStreetElementContainer.parentNode) {
+        lastOpenedStreetElementContainer.parentNode.removeChild(lastOpenedStreetElementContainer);
+        lastOpenedStreetElementContainer = null;
+    }
+
+    // Alphabet-Filter Zustand zurücksetzen und ausblenden
+    isAlphabetFilterExpanded = false; 
     if (alphabetFilterContainer) {
         alphabetFilterContainer.classList.remove('expanded');
-        // renderAlphabetFilter(); // Stellt sicher, dass es korrekt gezeichnet wird für "Alle"
+        alphabetFilterContainer.style.display = 'none'; 
+        alphabetFilterContainer.innerHTML = ''; // Sicherstellen, dass er leer ist für den nächsten Aufbau
     }
-    currentAlphabetFilter = 'Alle'; 
-    // updateAlphabetFilterActiveState(); // Wird von renderAlphabetFilter oder displayStreets (indirekt) gecallt
-    // updateToggleArrowIcon(); // Wird von renderAlphabetFilter gecallt
+    currentAlphabetFilter = null; // Wird in renderAlphabetFilter ggf. auf 'Alle' gesetzt
 
     const cachedStreetData = getFromLocalStorage(LS_STREET_CACHE_KEY);
     const currentPlz = plzInput.value.trim();
@@ -1401,8 +1615,11 @@ function handleSettingsEnter(event) {
 
 // Rendert die Alphabet-Buttons und den Toggle
 function renderAlphabetFilter() {
-    if (!alphabetFilterContainer) return;
-    alphabetFilterContainer.innerHTML = ''; // Leeren
+    if (!alphabetFilterContainer) {
+        console.error("alphabetFilterContainer ist nicht initialisiert!");
+        return;
+    }
+    alphabetFilterContainer.innerHTML = ''; // Immer leeren vor Neubau
 
     // Toggle-Button (früher "Alle"-Button)
     const toggleButton = document.createElement('button');

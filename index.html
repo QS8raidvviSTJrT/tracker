@@ -53,6 +53,9 @@
         <header class="app-header">
              <h2 id="currentViewTitle">Suche</h2>
              <div class="header-controls">
+                <button onclick="locateMe()" id="locateMeButton" aria-label="Standort suchen">
+                    <span class="material-icons">location_on</span>
+               </button>
                 <input type="text" id="plzInput" placeholder="PLZ" pattern="\d{5}" inputmode="numeric">
                 <button onclick="searchStreets()" id="searchStreetButton" aria-label="Straßen suchen">
                      <span class="material-icons">search</span>
