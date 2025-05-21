@@ -776,16 +776,41 @@ function displayStreets(streets, postalCode) {
 
     if (lastOpenedStreetData && lastOpenedStreetData.postalCode === postalCode) {
         lastOpenedStreetElementContainer = document.createElement('div');
-        lastOpenedStreetElementContainer.className = 'last-opened-street-button'; // Neue CSS-Klasse verwenden
+        lastOpenedStreetElementContainer.className = 'last-opened-street-button'; // Beibehaltung der Klasse für Basis-Styling
+
+        // Zusätzliches Styling für Gradient und Pfeil
+        lastOpenedStreetElementContainer.style.background = 'linear-gradient(135deg, var(--primary-color-light, #79bbff) 0%, var(--primary-color, #0d6efd) 100%)';
+        lastOpenedStreetElementContainer.style.color = 'white';
+        lastOpenedStreetElementContainer.style.display = 'flex';
+        lastOpenedStreetElementContainer.style.justifyContent = 'space-between';
+        lastOpenedStreetElementContainer.style.alignItems = 'center';
+        lastOpenedStreetElementContainer.style.padding = '8px 15px'; // Padding reduziert für geringere Höhe
+        lastOpenedStreetElementContainer.style.borderRadius = '8px'; // Abgerundete Ecken
+        // lastOpenedStreetElementContainer.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'; // Entfernt
+        lastOpenedStreetElementContainer.style.cursor = 'pointer';
+        lastOpenedStreetElementContainer.style.transition = 'transform 0.2s ease-out'; // Box-shadow transition entfernt
+
+        // Hover-Effekt ohne Schatten
+        lastOpenedStreetElementContainer.onmouseover = function() {
+            this.style.transform = 'translateY(-2px)';
+            // this.style.boxShadow = '0 6px 12px rgba(0,0,0,0.2)'; // Entfernt
+        };
+        lastOpenedStreetElementContainer.onmouseout = function() {
+            this.style.transform = 'translateY(0)';
+            // this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'; // Entfernt
+        };
         
-        const streetNameDisplay = lastOpenedStreetData.streetName.length > 35 
-            ? escapeHtml(lastOpenedStreetData.streetName.substring(0, 32)) + "..." 
+        const streetNameDisplay = lastOpenedStreetData.streetName.length > 30 
+            ? escapeHtml(lastOpenedStreetData.streetName.substring(0, 27)) + "..." 
             : escapeHtml(lastOpenedStreetData.streetName);
         
-        // HTML-Struktur für besseres Styling mit Präfix und Name
+        // HTML-Struktur für Text und Pfeil
         lastOpenedStreetElementContainer.innerHTML = 
-            `<span class="last-opened-prefix">Zuletzt:</span>` +
-            `<span class="last-opened-name">${streetNameDisplay}</span>`;
+            `<div style="display: flex; flex-direction: column;">
+                <span style="font-size: 0.75em; opacity: 0.9; line-height: 1.2;">Zuletzt geöffnet:</span>
+                <span style="font-weight: 500; font-size: 0.9em; line-height: 1.2;">${streetNameDisplay}</span>
+            </div>
+            <span class="material-icons" style="font-size: 24px; opacity: 0.9;">chevron_right</span>`; // Pfeilgröße leicht reduziert
         
         lastOpenedStreetElementContainer.title = `Gehe zu: ${escapeHtml(lastOpenedStreetData.streetName)}`;
         
