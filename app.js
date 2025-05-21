@@ -1646,6 +1646,11 @@ function renderAlphabetFilter() {
     }
     alphabetFilterContainer.innerHTML = ''; // Immer leeren vor Neubau
 
+    // Styling für den Container
+    alphabetFilterContainer.style.backgroundColor = 'var(--card-bg, #f8f9fa)'; // Hintergrundfarbe wie Listenelemente
+    alphabetFilterContainer.style.borderRadius = '8px'; // Abgerundete Ecken
+    alphabetFilterContainer.style.marginBottom = '10px'; // Abstand nach unten
+
     // Toggle-Button (früher "Alle"-Button)
     const toggleButton = document.createElement('button');
     toggleButton.id = 'alphabetToggleAllButton';
