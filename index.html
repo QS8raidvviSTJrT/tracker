@@ -27,19 +27,21 @@
     </div>
 
     <div class="login-container" id="loginContainer">
-        <img src="120.png" alt="Door Tracker Logo">
-        <h2>Door Tracker</h2>
+        <img src="180.png" alt="Door Tracker Logo">
+        <h2>SellX Solutions</h2>
+        <h3>Door Tracker</h3>
+        <br>
         <input type="email" id="loginEmail" placeholder="E-Mail-Adresse">
         <input type="password" id="loginPassword" placeholder="Passwort">
         <div id="registrationCodeContainer" style="display: none; margin-top: 15px;">
             <input type="text" id="registrationCode" placeholder="Registrierungscode (14-stellig)" maxlength="14" pattern="[a-zA-Z0-9]{14}" inputmode="text">
         </div>
-        <a href="/recovery/" id="resetText"><u>Passwort vergessen?</u></a>
+        <a href="/recovery/" id="resetText"><u style="color: var(--primary-color);">Passwort vergessen?</u></a>
         <div class="button-container">
             <button onclick="login()" class="loginbutton" id="login">Einloggen</button>
             <button onclick="register()" class="registerbutton hidden" id="register">Registrieren</button>
         </div>        
-        <div id="registerText"><a onclick="registerNow()">Neu bei Door Tracker? <u>Konto erstellen</u></a></div>
+        <div id="registerText"><a onclick="registerNow()">Neu bei SellX Solutions?</a></div>
         
         <!-- Install App Popup -->
         <div id="installPopup" class="install-popup">
@@ -295,6 +297,14 @@
                             <button onclick="saveSettings()" id="saveSettingsButton">Namen speichern</button>
                             <p id="settingsStatus" style="margin-top: 10px; font-size: 0.9em;"></p>
                         </div>
+                        <div class="settings-section" style="margin-top: 20px;">
+                            <label for="colorSchemeSelect">Farbschema:</label>
+                            <select id="colorSchemeSelect" aria-label="Farbschema auswählen">
+                                <option value="system">Geräte-Einstellung</option>
+                                <option value="light">Hell</option>
+                                <option value="dark">Dunkel</option>
+                            </select>
+                        </div>
                         <hr style="margin: 25px 0; border: none; border-top: 1px solid var(--card-border);">
                         <button onclick="logout()" class="settings-logout-button">
                             <span class="material-icons">logout</span> Ausloggen
@@ -302,7 +312,11 @@
                         <hr style="margin: 25px 0; border: none; border-top: 1px solid var(--card-border);">
                         <div id="versionHistoryContainer">
                             <h3>Versionshistorie & Neue Features</h3>
-                            <p><strong>Version 1.0 (Aktuell)</strong></p>
+                            <p><strong>Version 1.1 (Aktuell)</strong></p>
+                            <ul>
+                                <li>Dark Mode / Light Mode</li>
+                            </ul>
+                            <p><strong>Version 1.0</strong></p>
                             <ul>
                                 <li>Initialer Release der App</li>
                                 <li>Straßensuche und Erfassung</li>
@@ -310,8 +324,6 @@
                                 <li>Leaderboard</li>
                                 <li>Grundeinstellungen</li>
                             </ul>
-                            <!-- Weitere Versionen können hier hinzugefügt werden -->
-                            <p style="font-size: 0.8em; color: var(--text-secondary); margin-top: 15px;">App-Version: <span id="appVersion">1.0</span></p>
                         </div>
                     </div>
                 </div>

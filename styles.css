@@ -1,21 +1,77 @@
 :root {
     /* NEUES Farbschema */
     --primary-color: #2563eb;    /* Starkes professionelles Blau */
+    --primary-color-light: #79bbff; /* Helleres Blau für Akzente/Gradients */
     --secondary-color: #1e40af;  /* Dunkleres Blau für Tiefe */
     --accent-color: #0284c7;     /* Ergänzendes Business-Blau */
     --text-color: #1e293b;       /* Dunkles Schiefergrau für Text */
+    --text-color-muted: #6b7280; /* Gedämpfte Textfarbe für sekundäre Infos */
+    --text-color-light: #475569; /* Etwas hellere Textfarbe für Details */
     --bg-color: #ffffff;         /* Sauberes weißes Hintergrund */
     --card-bg: #f8fafc;          /* Helles Grau für Karten */
     --card-border: #e2e8f0;      /* Dezente Randfarbe */
+    --input-bg: #ffffff;         /* Hintergrund für Eingabefelder */
     --text-on-primary: #ffffff;  /* Textfarbe auf primärem Hintergrund */
     --text-on-accent: #ffffff;   /* Textfarbe auf Akzentfarbe */
     --danger-color: #dc2626;     /* Rot für Warnungen/Löschen */
     --success-color: #16a34a;    /* Grün für Erfolg */
+    --warning-color: #f59e0b;    /* Orange für Warnungen */
+    --info-color: #0284c7;       /* Blau für Info (oft wie Akzent) */
+    --chart-datalabel-color: #ffffff; /* Farbe für Datenlabels im Chart */
+    --skeleton-base-color: #e0e0e0;
+    --skeleton-shine-color: rgba(255,255,255,0.5);
+    --select-arrow-color: '%236b7280'; /* URL-kodiertes Grau für Select-Pfeil */
+
 
     --nav-height: 75px;          /* ANGEPASST: Höhe der Navigationsleiste erhöht (vorher 65px) */
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 10px); /* NEU: Für iOS Home Bar */
     --border-radius-std: 8px;    /* Standard Eckenradius */
     --border-radius-large: 12px; /* Größerer Eckenradius */
+
+    /* Stelle sicher, dass du Variablen für sekundäre Button-Farben hast oder definiere sie.
+       Diese sind Beispiele. Passe sie an dein Farbschema an. */
+    --button-secondary-bg: #6c757d; /* z.B. Grauton für Light Mode */
+    --button-secondary-text-color: white;
+    --button-secondary-hover-bg: #5a6268;
+
+    /* Stelle sicher, dass du Variablen für "danger" Button-Farben hast oder definiere sie. */
+    /* Diese sind Beispiele. Passe sie an dein Farbschema an. */
+    --danger-color: #dc3545; /* Standard Rot für Light Mode */
+    --danger-color-hover: #c82333;
+    --danger-text-color: white;
+}
+
+html[data-theme="dark"] {
+    --primary-color: #3b82f6;    /* Helleres Blau für Dark Mode */
+    --primary-color-light: #60a5fa;
+    --secondary-color: #2563eb;  /* Etwas dunkler als Primary im Dark Mode */
+    --accent-color: #0ea5e9;     /* Helleres Akzentblau */
+    --text-color: #e5e7eb;       /* Heller Text */
+    --text-color-muted: #9ca3af; /* Helleres gedämpftes Grau */
+    --text-color-light: #d1d5db;  /* Noch helleres Grau */
+    --bg-color: #111827;         /* Sehr dunkler Hintergrund (Tailwind gray-900) */
+    --card-bg: #1f2937;          /* Dunkleres Grau für Karten (Tailwind gray-800) */
+    --card-border: #374151;      /* Randfarbe für Karten (Tailwind gray-700) */
+    --input-bg: #374151;         /* Hintergrund für Eingabefelder im Dark Mode */
+    --text-on-primary: #ffffff;  /* Bleibt oft weiß */
+    --text-on-accent: #ffffff;   /* Bleibt oft weiß */
+    --danger-color: #ef4444;     /* Etwas helleres Rot für besseren Kontrast */
+    --success-color: #22c55e;    /* Etwas helleres Grün */
+    --warning-color: #f97316;    /* Etwas helleres Orange */
+    --info-color: #0ea5e9;       /* Wie Akzent */
+    --chart-datalabel-color: #1f2937; /* Dunkle Labels auf hellen Chart-Segmenten */
+    --skeleton-base-color: #374151; /* Dunklere Basis für Skeleton */
+    --skeleton-shine-color: rgba(75, 85, 99, 0.5); /* Dunklerer Schein */
+    --select-arrow-color: '%239ca3af'; /* URL-kodiertes helleres Grau für Select-Pfeil */
+
+    /* ... andere Dark Mode Variablen ... */
+    --button-secondary-bg: #495057; /* Dunkleres Grau für Dark Mode */
+    --button-secondary-text-color: #ced4da; /* Hellerer Text für Dark Mode */
+    --button-secondary-hover-bg: #5a6268;
+    /* Passe diese Farben für den Dark Mode an */
+    --danger-color: #a91e2c; /* Ein etwas gedämpfteres oder angepasstes Rot für Dark Mode */
+    --danger-color-hover: #8a1823;
+    --danger-text-color: #f8f9fa; /* Hellerer Text für Dark Mode */
 }
 
 * {
@@ -33,6 +89,7 @@ body {
     touch-action: pan-x pan-y;
     color: var(--text-color); /* Dunkler Text */
     -webkit-tap-highlight-color: transparent; /* Klick-Highlight auf Touch entfernen */
+    transition: background-color 0.3s ease, color 0.3s ease; /* Übergang für Theme-Wechsel */
 }
 
 /* --- Initial Loading Overlay --- */
@@ -49,7 +106,11 @@ body {
     align-items: center;
     z-index: 9999; /* Sehr hoher z-index, um über allem zu liegen */
     opacity: 1;
-    transition: opacity 0.3s ease-out; /* Sanftes Ausblenden */
+    transition: opacity 0.3s ease-out, background-color 0.3s ease; /* Sanftes Ausblenden */
+}
+
+html[data-theme="dark"] .initial-loading-overlay {
+    background-color: rgba(17, 24, 39, 0.85); /* Passend zum dunklen Hintergrund */
 }
 
 .initial-loading-overlay.hidden {
@@ -142,7 +203,7 @@ textarea {
     border: 1px solid var(--card-border); /* Dezenter Rand */
     border-radius: var(--border-radius-std); /* Standard Radius */
     font-size: 1rem;
-    background-color: var(--bg-color); /* Weißer Hintergrund */
+    background-color: var(--input-bg); /* ANGEPASST */
     color: var(--text-color); /* Dunkler Text */
     box-sizing: border-box; /* Korrektes Box-Modell */
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -154,12 +215,12 @@ textarea {
 input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--primary-color); /* Blauer Rand bei Fokus */
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); /* Leichter blauer Schein */
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent); /* Leichter Schein */
 }
 
 /* Select Pfeil */
 select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='var(--select-arrow-color)'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     background-size: 1.25em 1.25em;
@@ -187,7 +248,7 @@ button, .loginbutton, .registerbutton, #searchStreetButton, #installButton {
     font-weight: 500; /* Etwas fetter */
     cursor: pointer;
     border: none; /* Kein Rand standardmäßig */
-    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease, color 0.2s ease;
     text-align: center;
     display: inline-flex; /* Für Icon + Text Zentrierung */
     align-items: center;
@@ -271,7 +332,7 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
 /* NEU: Fehlerklasse für Input-Felder */
 input.error-input {
     border-color: var(--danger-color) !important;
-    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2) !important; /* Roter Schein */
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-color) 20%, transparent) !important; /* Roter Schein */
 }
 
 /* Sekundär/Register-Button */
@@ -285,7 +346,7 @@ input.error-input {
     left: 0;
 }
 .registerbutton:hover {
-    background-color: #0369a1; /* Dunkleres Akzent-Blau */
+    background-color: color-mix(in srgb, var(--accent-color) 85%, black); /* Dunkleres Akzent-Blau */
 }
 
 .hidden {
@@ -373,6 +434,9 @@ input.error-input {
     font-size: 0.95em; /* Etwas kleinere Schrift */
     text-align: center; /* Zahlen zentrieren */
     flex-shrink: 0; /* Nicht schrumpfen */
+    background-color: var(--input-bg); /* Sicherstellen, dass es die Input-BG-Variable nutzt */
+    color: var(--text-color);
+    border-color: var(--card-border);
 }
 
 /* Search Button im Header */
@@ -397,8 +461,8 @@ input.error-input {
     margin: 0; /* Kein extra Margin für Icon */
 }
 .app-header #searchStreetButton:hover {
-    background-color: #eef2ff; /* Heller blauer Hintergrund im Hover */
-    border-color: #dbeafe; /* Heller Rand im Hover */
+    background-color: color-mix(in srgb, var(--primary-color) 10%, transparent); /* Heller Hintergrund im Hover */
+    border-color: color-mix(in srgb, var(--primary-color) 20%, transparent); /* Heller Rand im Hover */
 }
 .app-header #searchStreetButton:active {
     transform: scale(0.95); /* Stärkerer Klick-Effekt */
@@ -447,8 +511,8 @@ input.error-input {
 
 
 .app-header #locateMeButton:hover:not(:disabled) {
-    background-color: #eef2ff; /* Heller blauer Hintergrund im Hover */
-    border-color: #dbeafe; /* Heller Rand im Hover */
+    background-color: color-mix(in srgb, var(--primary-color) 10%, transparent); /* Heller Hintergrund im Hover */
+    border-color: color-mix(in srgb, var(--primary-color) 20%, transparent); /* Heller Rand im Hover */
 }
 .app-header #locateMeButton:active:not(:disabled) {
     transform: scale(0.95);
@@ -646,9 +710,8 @@ body.nav-hidden .nav-fab {
     padding: 12px 15px; /* Angepasst für besseres Aussehen */
     font-size: 1em; /* Normale Schriftgröße */
     text-align: left;
-    background-color: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--border-radius-std);
+    background-color: transparent; /* Transparent, da Container Farbe hat */
+    border: none; /* Kein eigener Rand */
     color: var(--text-color);
     cursor: pointer;
     transition: background-color 0.2s ease, border-color 0.2s ease;
@@ -656,7 +719,7 @@ body.nav-hidden .nav-fab {
 }
 
 #alphabetToggleAllButton:hover {
-    background-color: #e9ecef; /* Leichter Hover-Effekt */
+    background-color: color-mix(in srgb, var(--text-color) 5%, transparent); /* Leichter Hover-Effekt */
 }
 
 #alphabetToggleAllButton.active {
@@ -674,6 +737,7 @@ body.nav-hidden .nav-fab {
 #alphabetToggleAllButton .expand-arrow {
     font-size: 24px; /* Passende Icongröße */
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Sanftere Apple-ähnliche Transition */
+    color: var(--text-color-muted);
 }
 
 /* Container für die eigentlichen Buchstaben-Buttons */
@@ -684,10 +748,10 @@ body.nav-hidden .nav-fab {
     --alphabet-wrapper-gap: 4px; /* Etwas kleinerer Abstand zwischen den Buchstaben-Buttons */
     gap: var(--alphabet-wrapper-gap);
     padding: 0; /* Wird bei .expanded gesetzt */
-    background-color: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-top: none; /* Vermeidet Doppelrand mit ToggleButton */
-    border-radius: 0 0 var(--border-radius-std) var(--border-radius-std);
+    background-color: transparent; /* Transparent, da Container Farbe hat */
+    /* border: 1px solid var(--card-border); */ /* Kein eigener Rand */
+    /* border-top: none; */ /* Vermeidet Doppelrand mit ToggleButton */
+    /* border-radius: 0 0 var(--border-radius-std) var(--border-radius-std); */ /* Wird vom Container geerbt */
     max-height: 0;
     opacity: 0;
     overflow: hidden;
@@ -697,8 +761,7 @@ body.nav-hidden .nav-fab {
 
 /* Zustand, wenn der Filter ausgeklappt ist */
 .alphabet-filter-container.expanded #alphabetToggleAllButton {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
+    border-bottom: 1px solid var(--card-border); /* Trennlinie zum Wrapper */
 }
 
 .alphabet-filter-container.expanded #alphabetToggleAllButton .expand-arrow {
@@ -722,7 +785,7 @@ body.nav-hidden .nav-fab {
     justify-content: center;
     align-items: center;
     border-radius: var(--border-radius-std, 6px);
-    background-color: #f8f9fa;
+    background-color: var(--bg-color);
     border: 1px solid var(--card-border);
     color: var(--primary-color);
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
@@ -754,7 +817,7 @@ body.nav-hidden .nav-fab {
     justify-content: center;
     align-items: center;
     border-radius: var(--border-radius-std, 6px);
-    background-color: #f8f9fa;
+    background-color: var(--input-bg);
     border: 1px solid var(--card-border);
     color: var(--primary-color);
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
@@ -769,19 +832,17 @@ body.nav-hidden .nav-fab {
     padding: 12px 15px;
     font-size: 1em; /* Schriftgröße für "Alle" Text */
     text-align: left;
-    background-color: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--border-radius-std);
+    background-color: transparent;
+    border: none;
     color: var(--text-color);
     cursor: pointer;
     transition: background-color 0.2s ease, border-color 0.2s ease;
-    margin-bottom: 0; /* Kein Abstand zum Wrapper */
-    /* box-sizing: border-box; ist hier nicht kritisch, da width: 100% */
+    margin-bottom: 0;
 }
 
 
 #alphabetToggleAllButton:hover {
-    background-color: #e9ecef;
+    background-color: color-mix(in srgb, var(--text-color) 5%, transparent);
 }
 
 #alphabetToggleAllButton.active {
@@ -802,8 +863,8 @@ body.nav-hidden .nav-fab {
 
 /* Hover, Active, Focus Stile für die Buchstaben-Buttons im Wrapper */
 #alphabetLettersWrapper .alphabet-button:hover {
-    background-color: #e9ecef;
-    border-color: #adb5bd;
+    background-color: color-mix(in srgb, var(--primary-color) 10%, transparent);
+    border-color: color-mix(in srgb, var(--primary-color) 20%, transparent);
 }
 
 #alphabetLettersWrapper .alphabet-button.active {
@@ -909,7 +970,7 @@ body.nav-hidden .nav-fab {
 .street-list-container > p { /* Für "Keine Ergebnisse"-Text */
      text-align: center;
      padding: 20px;
-     color: #6b7280;
+     color: var(--text-color-muted);
 }
 
 .street-item {
@@ -921,7 +982,7 @@ body.nav-hidden .nav-fab {
     color: var(--text-color); /* Dunkler Text */
 }
 .street-item:last-child { border-bottom: none; }
-.street-item:hover { background-color: #eef2ff; } /* Sehr heller blauer Hover */
+.street-item:hover { background-color: color-mix(in srgb, var(--primary-color) 10%, transparent); } /* Sehr heller Theme-Hover */
 
 /* Container für die Hausnummern-Details */
 .street-detail-container {
@@ -958,7 +1019,7 @@ body.nav-hidden .nav-fab {
     /* Andere Stile bleiben */
     width: 100%;
     border-radius: var(--border-radius-std);
-    background-color: var(--bg-color);
+    background-color: var(--input-bg);
     color: var(--text-color);
     border: 1px solid var(--card-border);
 }
@@ -1105,7 +1166,7 @@ body.nav-hidden .nav-fab {
 #loadingIndicator {
     text-align: center;
     padding: 15px;
-    color: #6b7280;
+    color: var(--text-color-muted);
 }
 #errorDisplay {
     background-color: #fee2e2; /* Heller roter Hintergrund */
@@ -1174,14 +1235,14 @@ body.nav-hidden .nav-fab {
 .loading-indicator-view, .error-display-view {
     text-align: center;
     padding: 40px 20px;
-    color: #6b7280;
+    color: var(--text-color-muted);
 }
 .error-display-view {
     color: var(--danger-color);
     background-color: #fee2e2;
     border: 1px solid #fecaca;
     border-radius: var(--border-radius-std);
-    margin: 20px; /* Abstand */
+    margin: 20px;
     padding: 15px;
 }
 
@@ -1196,7 +1257,7 @@ body.nav-hidden .nav-fab {
 }
 
 .stat-item {
-    background-color: var(--bg-color);
+    background-color: var(--input-bg);
     padding: 15px;
     border-radius: var(--border-radius-std);
     text-align: center;
@@ -1220,7 +1281,7 @@ body.nav-hidden .nav-fab {
 .stat-label {
     display: block;
     font-size: 0.85em;
-    color: #475569;
+    color: var(--text-color-light);
 }
 
 .chart-container {
@@ -1303,6 +1364,23 @@ body.nav-hidden .nav-fab {
     margin-bottom: 15px; /* Abstand zum Button */
 }
 
+.settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Kleiner Abstand zwischen Label/Input */
+}
+
+.settings-section label {
+    font-size: 0.9em;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.settings-section input#colorSchemeSelect {
+    /* Nimmt generische Input-Stile an */
+    margin-bottom: 15px; /* Abstand zum Button */
+}
+
 #saveSettingsButton {
      /* Nimmt primären Button-Stil an */
      background-color: var(--primary-color);
@@ -1327,14 +1405,14 @@ body.nav-hidden .nav-fab {
 
 .settings-logout-button {
     /* Style wie Abbrechen-Button */
-    background-color: #e2e8f0;
+    background-color: var(--danger-color);
     color: var(--text-color);
     border: 1px solid var(--card-border);
     width: 100%; /* Volle Breite */
     padding: 12px 20px;
 }
 .settings-logout-button:hover {
-    background-color: #cbd5e1;
+    background-color: var(--danger-color-hover);
 }
 .settings-logout-button span {
     vertical-align: -3px; /* Icon besser ausrichten */
@@ -1389,7 +1467,7 @@ body.nav-hidden .nav-fab {
 }
 
 .time-tracking-status-display {
-    background-color: var(--bg-color);
+    background-color: var(--input-bg);
     padding: 15px;
     border-radius: var(--border-radius-std);
     margin-bottom: 20px;
@@ -1480,12 +1558,12 @@ body.nav-hidden .nav-fab {
     border: 1px solid var(--card-border);
     border-radius: var(--border-radius-std);
     font-size: 0.9em;
-    background-color: var(--bg-color);
+    background-color: var(--input-bg);
     color: var(--text-color);
 }
 
 .daily-summary-display {
-    background-color: var(--bg-color);
+    background-color: var(--input-bg);
     padding: 15px;
     border-radius: var(--border-radius-std);
     margin-bottom: 15px;
@@ -1518,7 +1596,7 @@ body.nav-hidden .nav-fab {
 }
 
 .time-entry-li {
-    background-color: var(--bg-color);
+    background-color: var(--input-bg);
     padding: 12px 15px;
     border: 1px solid var(--card-border);
     border-radius: var(--border-radius-std);
@@ -1550,7 +1628,7 @@ body.nav-hidden .nav-fab {
 
 /* --- SKELETON LOADING STYLES --- */
 .skeleton {
-    background-color: #e0e0e0; /* Helle Graufarbe für Skeleton-Elemente */
+    background-color: var(--skeleton-base-color); /* Helle Graufarbe für Skeleton-Elemente */
     border-radius: var(--border-radius-std, 8px);
     position: relative;
     overflow: hidden; /* Wichtig für die Animation */
@@ -1563,7 +1641,7 @@ body.nav-hidden .nav-fab {
     left: -150%; /* Startet außerhalb des sichtbaren Bereichs */
     height: 100%;
     width: 150%;
-    background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%);
+    background: linear-gradient(to right, transparent 0%, var(--skeleton-shine-color) 50%, transparent 100%);
     animation: skeleton-shine 1.5s infinite linear;
 }
 
@@ -1811,4 +1889,48 @@ body.nav-hidden .nav-fab {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Styling für den neuen .button-secondary */
+.button-secondary {
+    background-color: var(--button-secondary-bg);
+    color: var(--button-secondary-text-color);
+    border: 1px solid var(--button-secondary-bg); /* Oder eine spezifische Border-Variable */
+}
+
+.button-secondary:hover {
+    background-color: var(--button-secondary-hover-bg);
+    border-color: var(--button-secondary-hover-bg);
+}
+
+/* Wenn du die Buttons innerhalb der form-button-group spezifischer ansprechen möchtest: */
+.form-button-group .button-secondary {
+    /* Hier könnten spezifischere Stile oder Overrides platziert werden, falls nötig */
+}
+
+/* Styling für .button-danger (Logout Button) */
+.button-danger {
+    background-color: var(--danger-color) !important; /* Wichtig, falls Inline-Styles überschrieben werden müssen */
+    color: var(--danger-text-color) !important;
+    border: 1px solid var(--danger-color) !important;
+    /* Behalte andere Stile wie padding, border-radius etc. bei oder passe sie hier an */
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px; /* Abstand zwischen Icon und Text */
+}
+
+.button-danger:hover {
+    background-color: var(--danger-color-hover) !important;
+    border-color: var(--danger-color-hover) !important;
+}
+
+/* Spezifisch für den Logout-Button in den Einstellungen, falls nötig */
+#settingsView .button-danger {
+    width: 100%;
+    margin-top: 20px;
 }

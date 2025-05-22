@@ -6,6 +6,7 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
         const LS_STREET_CACHE_KEY = 'doorTrackerStreetCache';
         const LS_ACTIVE_STREET_DETAIL_KEY = 'doorTrackerActiveStreetDetail';
         const LS_LAST_OPENED_STREET_KEY = 'doorTrackerLastOpenedStreet'; // NEU
+        const LS_COLOR_SCHEME_KEY = 'doorTrackerColorScheme'; // NEU für Farbschema
 
         // NEU: LocalStorage Helper Functions
         function saveToLocalStorage(key, data) {
@@ -33,6 +34,55 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
                 console.warn("Error removing from localStorage", key, e);
             }
         }
+
+        // --- NEU: Funktionen für Farbschema (HIERHIN VERSCHOBEN) ---
+        let currentColorScheme = 'system'; // Default, wird beim Laden überschrieben
+        let systemThemeListener = null; // Für den Media Query Listener
+
+        function applyColorScheme(scheme) {
+            if (!['light', 'dark', 'system'].includes(scheme)) {
+                console.warn('Ungültiges Farbschema:', scheme);
+                scheme = 'system'; // Fallback
+            }
+
+            currentColorScheme = scheme; // Benutzerauswahl speichern
+            saveToLocalStorage(LS_COLOR_SCHEME_KEY, scheme);
+
+            let themeToSet;
+            if (scheme === 'system') {
+                themeToSet = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                // Listener für Systemänderungen hinzufügen/aktualisieren
+                if (!systemThemeListener) {
+                    systemThemeListener = (e) => {
+                        if (currentColorScheme === 'system') { // Nur anwenden, wenn System-Modus aktiv ist
+                            document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+                        }
+                    };
+                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', systemThemeListener);
+                }
+            } else {
+                themeToSet = scheme;
+                // Ggf. bestehenden System-Listener entfernen, wenn explizit Light/Dark gewählt wird
+                // Obwohl es nicht schadet, ihn aktiv zu lassen, solange currentColorScheme nicht 'system' ist.
+            }
+
+            document.documentElement.setAttribute('data-theme', themeToSet);
+            console.log(`Farbschema angewendet: User-Auswahl='${scheme}', Tatsächlich='${themeToSet}'`);
+
+            // Aktualisiere das Select-Element, falls es existiert und sichtbar ist
+            // Stelle sicher, dass colorSchemeSelect initialisiert wurde, bevor darauf zugegriffen wird
+            if (colorSchemeSelect && colorSchemeSelect.value !== scheme) {
+                colorSchemeSelect.value = scheme;
+            }
+        }
+
+        function loadAndApplyInitialColorScheme() {
+            const storedScheme = getFromLocalStorage(LS_COLOR_SCHEME_KEY);
+            // Stellt sicher, dass 'system' der Default ist, wenn nichts gespeichert oder ein ungültiger Wert gespeichert wurde.
+            applyColorScheme(storedScheme || 'system');
+        }
+        // --- ENDE VERSCHOBENE FUNKTIONEN ---
+
 
         let deferredPrompt;
 let currentUser = null;
@@ -89,6 +139,7 @@ const settingsContent = document.getElementById('settingsContent');
 const displayNameInput = document.getElementById('displayNameInput');
 const saveSettingsButton = document.getElementById('saveSettingsButton');
 const settingsStatus = document.getElementById('settingsStatus');
+let colorSchemeSelect = null; // Wird in loadSettingsData initialisiert
 
 const streetListPlaceholder = document.getElementById('streetListPlaceholder'); // Referenz zum Platzhalter
 const alphabetFilterContainer = document.getElementById('alphabetFilterContainer'); // NEU
@@ -1049,7 +1100,7 @@ function renderStreetDetailView(streetName) {
         <textarea id="notesInput" placeholder="Notizen..." style="width: 100%; min-height: 80px; margin-bottom: 15px; ${inputStyle}"></textarea>
         <div class="form-button-group">
             <button onclick="saveOrUpdateHouseEntry()">Speichern</button>
-            <button onclick="clearHouseEntryForm()">Abbrechen/Neu</button>
+            <button onclick="clearHouseEntryForm()" class="button-secondary">Abbrechen/Neu</button>
         </div>
     `;
     streetDetailContainer.appendChild(formDiv);
@@ -1916,25 +1967,39 @@ async function loadSettingsData() {
 
     // Skeleton wird von switchView angezeigt. Inhalt wird von switchView ausgeblendet.
     if (settingsErrorDisplay) settingsErrorDisplay.style.display = 'none';
-    // if (settingsLoadingIndicator) settingsLoadingIndicator.style.display = 'flex'; // ENTFERNT
     if (settingsStatus) settingsStatus.textContent = '';
     if (settingsStatus) settingsStatus.className = '';
 
     try {
-        // Hole aktuelle Benutzerdaten, inklusive Metadaten
-        // Wichtig: getSession liefert nicht immer die aktuellsten Metadaten, getUser ist besser
         const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        if (userError) throw userError;
+        if (!user) throw new Error("Benutzerdaten konnten nicht geladen werden.");
 
-         if (userError) throw userError;
-         if (!user) throw new Error("Benutzerdaten konnten nicht geladen werden.");
-
-
-        // Setze den aktuellen Anzeigenamen ins Feld
         const currentDisplayName = user.user_metadata?.display_name || '';
         if (displayNameInput) displayNameInput.value = currentDisplayName;
 
-        if (settingsContent) settingsContent.style.display = 'block'; // Inhalt anzeigen
-        if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden'); // Skeleton ausblenden
+        // --- Farbschema-Auswahl initialisieren ---
+        // Das HTML-Element wird jetzt direkt aus index.html erwartet
+        colorSchemeSelect = document.getElementById('colorSchemeSelect'); // colorSchemeSelect wird hier initialisiert
+        const initialColorSchemeForSelect = getFromLocalStorage(LS_COLOR_SCHEME_KEY) || 'system';
+
+        if (colorSchemeSelect) {
+            colorSchemeSelect.value = initialColorSchemeForSelect;
+            // Event-Listener nur einmalig hinzufügen, falls er noch nicht existiert
+            if (!colorSchemeSelect.hasAttribute('data-listener-added')) {
+                colorSchemeSelect.addEventListener('change', (event) => {
+                    applyColorScheme(event.target.value); // applyColorScheme ist jetzt definiert
+                });
+                colorSchemeSelect.setAttribute('data-listener-added', 'true');
+            }
+        } else {
+            console.warn("Farbschema Select-Element (colorSchemeSelect) nicht im DOM gefunden.");
+        }
+        // --- ENDE Farbschema-Auswahl ---
+
+
+        if (settingsContent) settingsContent.style.display = 'block';
+        if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden');
 
     } catch (error) {
         console.error("Fehler beim Laden der Einstellungen:", error);
@@ -1942,10 +2007,8 @@ async function loadSettingsData() {
             settingsErrorDisplay.textContent = `Fehler beim Laden der Einstellungen: ${error.message}`;
             settingsErrorDisplay.style.display = 'block';
         }
-        if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden'); // Skeleton bei Fehler ausblenden
-        if (settingsContent) settingsContent.style.display = 'none'; // Sicherstellen, dass Inhalt ausgeblendet bleibt
-    } finally {
-        // if (settingsLoadingIndicator) settingsLoadingIndicator.style.display = 'none'; // ENTFERNT
+        if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden');
+        if (settingsContent) settingsContent.style.display = 'none';
     }
 }
 
@@ -2249,6 +2312,8 @@ function showSettingsMessage(message, isError = false) {
 
 // --- Initialisierung ---
 document.addEventListener('DOMContentLoaded', () => {
+    loadAndApplyInitialColorScheme(); // loadAndApplyInitialColorScheme ist jetzt definiert
+
     // Overlay ist initial sichtbar.
     // Die checkSession-Funktion kümmert sich um das Ausblenden.
     setupLoginEnterListeners();
