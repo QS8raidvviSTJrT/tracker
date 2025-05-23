@@ -4586,10 +4586,10 @@ async function exportMyWorkTimeAsPdf(year, month) {
     }
 
     const monthName = new Date(year, month - 1).toLocaleString('de-DE', { month: 'long' });
-    const title = `Meine Arbeitszeitauswertung für ${monthName} ${year}`;
+    const title = `Zeitnachweis ${monthName} ${year}`;
     const filename = `Arbeitszeiten_${currentUser.user_metadata?.display_name || 'User'}_${year}_${String(month).padStart(2, '0')}.pdf`;
 
-    showErrorNotification(`Export für ${monthName} ${year} wird vorbereitet...`);
+    //showErrorNotification(`Export für ${monthName} ${year} wird vorbereitet...`);
 
     try {
         // 1. Lade die work_time_entries für den aktuellen Benutzer und den ausgewählten Monat/Jahr.
@@ -4614,7 +4614,7 @@ async function exportMyWorkTimeAsPdf(year, month) {
             doc.setFontSize(18);
             doc.text(title, 14, 22);
             doc.setFontSize(12);
-            doc.text(`Benutzer: ${currentUser.user_metadata?.display_name || currentUser.email || 'Unbekannt'}`, 14, 30);
+            doc.text(`Mitarbeiter: ${currentUser.user_metadata?.display_name || currentUser.email || 'Unbekannt'}`, 14, 30);
             doc.text(`Exportiert am: ${new Date().toLocaleString('de-DE')}`, 14, 38);
             doc.text(`Keine Einträge für ${monthName} ${year} vorhanden.`, 14, 50);
             doc.save(filename);
@@ -4634,7 +4634,7 @@ async function exportMyWorkTimeAsPdf(year, month) {
         doc.setFontSize(18);
         doc.text(title, 14, 22);
         doc.setFontSize(12);
-        doc.text(`Benutzer: ${currentUser.user_metadata?.display_name || currentUser.email || 'Unbekannt'}`, 14, 30);
+        doc.text(`Mitarbeiter: ${currentUser.user_metadata?.display_name || currentUser.email || 'Unbekannt'}`, 14, 30);
         doc.text(`Gesamtarbeitszeit ${monthName} ${year}: ${totalHoursMonthFormatted}`, 14, 38);
         doc.text(`Exportiert am: ${new Date().toLocaleString('de-DE')}`, 14, 46);
 
@@ -4684,7 +4684,7 @@ async function exportMyWorkTimeAsPdf(year, month) {
         }
 
         doc.save(filename);
-        showErrorNotification(`PDF "${filename}" erfolgreich heruntergeladen.`);
+        //showErrorNotification(`PDF "${filename}" erfolgreich heruntergeladen.`);
 
     } catch (err) {
         console.error(`Fehler beim Erstellen des PDFs für ${monthName} ${year}:`, err);
