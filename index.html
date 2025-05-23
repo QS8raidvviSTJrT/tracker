@@ -178,8 +178,15 @@
 
                 <!-- Stats View Skeleton Loader -->
                 <div class="skeleton-loader stats-view-skeleton">
+                    <div class="filter-controls skeleton-filter-controls" style="margin-bottom: 15px;">
+                        <div class="skeleton skeleton-button" style="width: 70px; height: 36px;"></div>
+                        <div class="skeleton skeleton-button" style="width: 100px; height: 36px;"></div>
+                        <div class="skeleton skeleton-button" style="width: 110px; height: 36px;"></div>
+                        <div class="skeleton skeleton-button" style="width: 100px; height: 36px;"></div>
+                        <div class="skeleton skeleton-button" style="width: 70px; height: 36px;"></div>
+                    </div>
                     <div class="content-card skeleton-card">
-                        <div class="skeleton skeleton-title" style="width: 60%; margin-bottom: 20px;"></div>
+                        <!-- Kein expliziter Titel im Skeleton, da im HTML auskommentiert -->
                         <div class="stats-grid-skeleton">
                             <!-- Erstes Item nimmt volle Breite -->
                             <div class="skeleton skeleton-stat-item full-width-skeleton-item"></div>
@@ -190,8 +197,8 @@
                             <div class="skeleton skeleton-stat-item"></div>
                         </div>
                     </div>
-                    <div class="content-card skeleton-card">
-                        <div class="skeleton skeleton-title" style="width: 70%; margin-bottom: 20px;"></div>
+                    <div class="content-card skeleton-card" style="margin-top: 15px;">
+                        <!-- Kein expliziter Titel im Skeleton, da im HTML auskommentiert -->
                         <div class="skeleton skeleton-chart-container"></div>
                     </div>
                 </div>
@@ -206,7 +213,7 @@
 
                 <div id="statsContent" style="display: none;">
                     <div class="content-card">
-                        <h2>Deine Statistik</h2>
+                        <!--<h2>Deine Statistik</h2>-->
                         <div class="stats-grid">
                             <div class="stat-item">
                                 <span class="stat-value" id="statTotalEntries">0</span>
@@ -231,7 +238,7 @@
                         </div>
                     </div>
                     <div class="content-card">
-                        <h2>Status Verteilung</h2>
+                        <!--<h2>Status Verteilung</h2>-->
                         <div class="chart-container">
                              <canvas id="statusChart"></canvas>
                         </div>
@@ -248,7 +255,7 @@
                 <!-- Leaderboard View Skeleton Loader -->
                 <div class="skeleton-loader leaderboard-view-skeleton">
                     <div class="content-card skeleton-card">
-                        <div class="skeleton skeleton-title" style="width: 50%; margin-bottom: 20px;"></div>
+                        <!-- Kein expliziter Titel im Skeleton, da im HTML auskommentiert -->
                         <div class="skeleton-table-skeleton">
                             <div class="skeleton-table-row">
                                 <div class="skeleton skeleton-rank"></div>
@@ -281,7 +288,7 @@
 
                 <div id="leaderboardContent" style="display: none;">
                     <div class="content-card">
-                        <h2>Leaderboard</h2>
+                        <!--<h2>Leaderboard</h2>-->
                         <div class="table-container">
                             <table id="leaderboardTable">
                                 <thead>
@@ -309,18 +316,35 @@
                 <!-- Settings View Skeleton Loader -->
                 <div class="skeleton-loader settings-view-skeleton">
                     <div class="content-card skeleton-card">
-                        <div class="skeleton skeleton-title" style="width: 50%; margin-bottom: 25px;"></div>
-                        <div class="skeleton skeleton-label" style="width: 60%;"></div>
-                        <div class="skeleton skeleton-input"></div>
-                        <div class="skeleton skeleton-settings-button"></div>
-                        <hr style="margin: 25px 0; border: none; border-top: 1px solid var(--card-border);">
-                        <div class="skeleton skeleton-logout-button"></div>
+                        <!-- Kein expliziter Titel im Skeleton, da im HTML auskommentiert -->
+                        <div class="skeleton skeleton-label" style="width: 70%; margin-bottom: 8px;"></div> <!-- Label für DisplayName -->
+                        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                             <div class="skeleton skeleton-input" style="flex-grow: 1;"></div> <!-- Input für DisplayName -->
+                             <div class="skeleton skeleton-button" style="width: 100px; height: 40px;"></div> <!-- Speicherbutton -->
+                        </div>
+                        <div class="skeleton skeleton-label" style="width: 40%; margin-bottom: 8px;"></div> <!-- Label für Farbschema -->
+                        <div class="skeleton skeleton-input" style="height: 40px; margin-bottom: 20px;"></div> <!-- Select für Farbschema -->
+                        
+                        <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--card-border-skeleton);">
+                        
+                        <div class="skeleton skeleton-text small" style="width: 80%; margin: 0 auto 15px auto; height: 1em;"></div> <!-- Angemeldet mit... -->
+                        <div class="skeleton skeleton-settings-button" style="margin-bottom: 20px;"></div> <!-- Logout Button -->
+
+                        <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--card-border-skeleton);">
+
+                        <div class="skeleton skeleton-label" style="width: 60%; margin-bottom: 15px; font-size: 1.1em;"></div> <!-- Versionshistorie Titel -->
+                        <div class="skeleton skeleton-text medium" style="margin-bottom: 8px;"></div>
+                        <div class="skeleton skeleton-text short" style="margin-left: 15px; margin-bottom: 5px;"></div>
+                        <div class="skeleton skeleton-text short" style="margin-left: 15px; margin-bottom: 10px;"></div>
+                        <div class="skeleton skeleton-text medium" style="margin-bottom: 8px;"></div>
+                        <div class="skeleton skeleton-text short" style="margin-left: 15px; margin-bottom: 5px;"></div>
+                        <div class="skeleton skeleton-text short" style="margin-left: 15px; margin-bottom: 10px;"></div>
                     </div>
                 </div>
 
                 <div id="settingsContent" style="display: none;">
                     <div class="content-card">
-                        <h2>Einstellungen</h2>
+                        <!--<h2>Einstellungen</h2>-->
                         <div class="settings-form">
                             <label for="displayNameInput">Vorname (für Leaderboard):</label>
                             <div class="input-with-button">
@@ -332,7 +356,7 @@
                             </div>
                             <p id="settingsStatus" style="margin-top: 10px; font-size: 0.9em;"></p>
                         </div>
-                        <div class="settings-section" style="margin-top: 20px;">
+                        <div class="settings-section">
                             <label for="colorSchemeSelect">Farbschema:</label>
                             <select id="colorSchemeSelect" aria-label="Farbschema auswählen">
                                 <option value="system">Geräte-Einstellung</option>
@@ -381,7 +405,7 @@
                 <!-- Calendar View Skeleton Loader -->
                 <div class="skeleton-loader calendar-view-skeleton">
                     <div class="content-card skeleton-card">
-                        <div class="skeleton skeleton-title" style="width: 70%; margin-bottom: 20px;"></div>
+                        <!-- Kein expliziter Titel im Skeleton, da im HTML auskommentiert -->
                         <div class="skeleton-status-item">
                             <div class="skeleton skeleton-text short skeleton-status-label"></div>
                             <div class="skeleton skeleton-text medium skeleton-status-value"></div>
@@ -399,7 +423,7 @@
                             <div class="skeleton skeleton-time-button"></div>
                         </div>
                     </div>
-                    <div class="content-card skeleton-card">
+                    <div class="content-card skeleton-card" style="margin-top: 15px;">
                         <div class="skeleton-history-header">
                             <div class="skeleton skeleton-history-title"></div>
                             <div class="skeleton skeleton-date-input"></div>
@@ -417,7 +441,7 @@
                 </div>
 
                 <div id="timeTrackingControls" class="content-card">
-                    <h2>Arbeitszeiterfassung</h2>
+                    <!--<h2>Arbeitszeiterfassung</h2>-->
                     <div id="timeTrackingStatusDisplay" class="time-tracking-status-display">
                         <div class="status-item">
                             <span class="status-label">Status:</span>
@@ -475,10 +499,12 @@
                 <!-- Admin View Skeleton Loader -->
                 <div class="skeleton-loader admin-view-skeleton">
                     <div class="content-card skeleton-card">
-                        <div class="skeleton skeleton-title" style="width: 60%; margin-bottom: 20px;"></div>
-                        <div class="skeleton skeleton-button" style="height: 40px; margin-bottom: 15px;"></div>
-                        <div class="skeleton skeleton-button" style="height: 40px; margin-bottom: 15px;"></div>
-                        <div class="skeleton skeleton-button" style="height: 40px;"></div>
+                        <div class="skeleton skeleton-title" style="width: 70%; margin-bottom: 10px;"></div> <!-- Titel: Admin-Bereich: Datenexport -->
+                        <div class="skeleton skeleton-text medium" style="height: 3.5em; margin-bottom: 20px;"></div> <!-- Beschreibungstext -->
+                        <div class="admin-export-buttons-skeleton" style="display: flex; flex-direction: column; gap: 10px;">
+                            <div class="skeleton skeleton-button" style="height: 40px; width: 100%;"></div> <!-- Straßendaten exportieren Button -->
+                            <div class="skeleton skeleton-button" style="height: 40px; width: 100%;"></div> <!-- Arbeitszeitauswertung Button -->
+                        </div>
                     </div>
                 </div>
 
