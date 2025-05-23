@@ -65,7 +65,7 @@ html[data-theme="dark"] {
     --select-arrow-color: '%239ca3af'; /* URL-kodiertes helleres Grau für Select-Pfeil */
 
     /* ... andere Dark Mode Variablen ... */
-    --button-secondary-bg: #495057; /* Dunkleres Grau für Dark Mode */
+    --button-secondary-bg: #0a0b0c; /* Dunkleres Grau für Dark Mode */
     --button-secondary-text-color: #ced4da; /* Hellerer Text für Dark Mode */
     --button-secondary-hover-bg: #5a6268;
     /* Passe diese Farben für den Dark Mode an */
@@ -284,15 +284,18 @@ button:active, .loginbutton:active, .registerbutton:active, #searchStreetButton:
 .loginbutton.loading::after {
     content: ''; /* Spinner-Element */
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 0; /* NEU */
+    bottom: 0; /* NEU */
+    left: 0; /* NEU */
+    right: 0; /* NEU */
+    margin: auto; /* NEU - Zentriert das Element mit fester Größe */
     width: 20px; /* Spinner-Größe */
     height: 20px;
     border: 3px solid var(--text-on-primary); /* Spinner-Farbe */
     border-top: 3px solid transparent; /* Transparent für den Spinner-Effekt */
     border-radius: 50%; /* Rund */
     animation: spin 0.6s linear infinite; /* Animation */
-    transform: translate(-50%, -50%); /* Zentrieren */
+    /* transform: translate(-50%, -50%); ENTFERNT */
 }
 
 /* Spinner-Animation */
@@ -984,6 +987,49 @@ body.nav-hidden .nav-fab {
 .street-item:last-child { border-bottom: none; }
 .street-item:hover { background-color: color-mix(in srgb, var(--primary-color) 10%, transparent); } /* Sehr heller Theme-Hover */
 
+/* NEU: Stile für die Fortschrittsanzeige im Street Item */
+.street-item {
+    display: flex; /* Um Namen und Fortschritt nebeneinander zu platzieren */
+    justify-content: space-between; /* Namen links, Fortschritt rechts */
+    align-items: center; /* Vertikal zentrieren */
+}
+
+.street-item-name {
+    flex-grow: 1; /* Nimmt den meisten Platz ein */
+    /* margin-right: 10px; */ /* KORREKT ENTFERNT: Abstand zum Fortschrittsindikator */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.street-item-progress {
+    display: flex;
+    align-items: center;
+    gap: 5px; /* Abstand zwischen SVG und Prozentzahl */
+    flex-shrink: 0; /* Verhindert, dass es schrumpft */
+}
+
+.street-item-progress .progress-ring {
+    width: 20px; /* Kleinere Größe für die Liste */
+    height: 20px;
+    /* viewBox wird im HTML gesetzt: viewBox="0 0 20 20" */
+}
+
+.street-item-progress .progress-ring__background,
+.street-item-progress .progress-ring__circle {
+    r: 8; /* Radius anpassen für die kleinere Größe */
+    cx: 10; /* Mittelpunkt X für 20x20 SVG */
+    cy: 10; /* Mittelpunkt Y für 20x20 SVG */
+    stroke-width: 2; /* Linienstärke für den kleineren Kreis anpassen */
+}
+
+.street-item-progress .progress-percentage {
+    font-size: 0.8em;
+    min-width: 30px; /* Platz für "100%" oder "X ✓" */
+    text-align: right;
+}
+
+
 /* Container für die Hausnummern-Details */
 .street-detail-container {
     margin-top: 0;
@@ -1338,12 +1384,9 @@ body.nav-hidden .nav-fab {
 
 /* Highlight für aktuellen User */
 #leaderboardTable tbody tr.current-user-row {
-    background-color: #dbeafe; /* Hellblau */
     font-weight: bold;
 }
-#leaderboardTable tbody tr.current-user-row:hover {
-    background-color: #bfdbfe; /* Etwas dunkleres Blau im Hover */
-}
+
 
 
 /* --- EINSTELLUNGEN VIEW --- */
@@ -1560,33 +1603,45 @@ body.nav-hidden .nav-fab {
     font-size: 0.9em;
     background-color: var(--input-bg);
     color: var(--text-color);
+    /* NEU: Breite anpassen und Ausrichtung */
+    width: auto; /* Automatische Breite basierend auf Inhalt */
+    min-width: 130px; /* Mindestbreite, um das Datum gut anzuzeigen */
+    max-width: 150px; /* Maximale Breite, um nicht zu groß zu werden */
+    text-align: center; /* Datum zentrieren */
+    /* Flexibilität, falls mehr Elemente in den Header kommen */
+    flex-shrink: 0; 
 }
 
 .daily-summary-display {
-    background-color: var(--input-bg);
-    padding: 15px;
-    border-radius: var(--border-radius-std);
-    margin-bottom: 15px;
-    border: 1px solid var(--card-border);
+    background-color: transparent; /* ENTFERNT: var(--input-bg); */
+    padding: 10px 0; /* Angepasst: Weniger vertikales Padding, kein horizontales */
+    border-radius: 0; /* ENTFERNT: var(--border-radius-std); */
+    margin-bottom: 20px; /* Etwas mehr Abstand nach unten zur Liste */
+    border: none; /* ENTFERNT: 1px solid var(--card-border); */
+    /* border-top: 1px solid var(--card-border);  Optional: Eine feine Trennlinie nach oben, falls gewünscht */
 }
 .daily-summary-display h4 {
     margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 1em;
-    font-weight: 600;
-    text-align: center;
+    margin-bottom: 8px; /* Reduziert */
+    font-size: 0.95em; /* Etwas kleiner */
+    font-weight: 500; /* Weniger fett */
+    text-align: left; /* Linksbündig */
+    color: var(--text-color-muted); /* Gedämpfte Farbe */
 }
 .summary-item {
     display: flex;
     justify-content: space-between;
-    font-size: 0.9em;
-    padding: 5px 0;
+    align-items: center; /* Vertikal zentrieren */
+    font-size: 1em; /* Klare Schriftgröße für die Werte */
+    padding: 4px 0; /* Angepasst */
 }
 .summary-label {
     color: var(--text-color-muted, #475569);
+    font-size: 0.9em; /* Label etwas kleiner als der Wert */
 }
 .summary-value {
-    font-weight: 500;
+    font-weight: 600; /* Wert bleibt fett für gute Lesbarkeit */
+    color: var(--text-color); /* Haupttextfarbe für den Wert */
 }
 
 .time-entries-list {
@@ -1876,12 +1931,6 @@ body.nav-hidden .nav-fab {
 }
 
 
-/* Optional, um den Text im Button besser zu formatieren, falls du <spans> verwendest */
-/* .last-opened-street-button span {
-  vertical-align: middle; // Ist durch Flexbox oder Block-Elemente meist schon gut
-} */
-
-/* ... restliche Stile ... */
 
 .spin {
     animation: spin 1s linear infinite;
@@ -1903,10 +1952,7 @@ body.nav-hidden .nav-fab {
     border-color: var(--button-secondary-hover-bg);
 }
 
-/* Wenn du die Buttons innerhalb der form-button-group spezifischer ansprechen möchtest: */
-.form-button-group .button-secondary {
-    /* Hier könnten spezifischere Stile oder Overrides platziert werden, falls nötig */
-}
+
 
 /* Styling für .button-danger (Logout Button) */
 .button-danger {
@@ -1934,3 +1980,420 @@ body.nav-hidden .nav-fab {
     width: 100%;
     margin-top: 20px;
 }
+
+/* --- Notification Toasts --- */
+.notification-container {
+    position: fixed;
+    top: 20px; /* Abstand vom oberen Rand */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999; /* Über allem anderen */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px; /* Abstand zwischen mehreren Notifications */
+    width: 90%; /* Relative Breite */
+    max-width: 450px; /* Maximale Breite der Benachrichtigung */
+    pointer-events: none; /* Klicks sollen durch den Container gehen */
+}
+
+.notification-toast {
+    background-color: var(--danger-color); /* Nutzt deine bestehende danger-color Variable */
+    color: var(--text-on-primary); /* Heller Text für guten Kontrast auf rotem Grund */
+    padding: 12px 18px;
+    border-radius: var(--border-radius-std, 8px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    font-size: 0.9em;
+    line-height: 1.4;
+    width: 100%;
+    box-sizing: border-box;
+    opacity: 0; /* Start unsichtbar für Animation */
+    /* transform: translateY(-20px);  Wird durch Keyframes gehandhabt */
+    animation: fadeInOutToast 5s ease-in-out forwards;
+    pointer-events: auto; /* Klicks auf die Benachrichtigung selbst zulassen */
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Abstand zwischen Icon und Text */
+}
+
+.notification-toast .material-icons {
+    font-size: 22px; /* Passende Icon-Größe */
+    flex-shrink: 0; /* Verhindert, dass das Icon schrumpft */
+}
+
+.notification-toast span:not(.material-icons) {
+    white-space: pre-wrap; /* Erlaubt Zeilenumbrüche in der Nachricht */
+    word-break: break-word; /* Bricht lange Wörter um, um Überlauf zu verhindern */
+    flex-grow: 1;
+}
+
+
+@keyframes fadeInOutToast {
+    0% {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.95);
+    }
+    10% { /* Schnelles Einblenden und leichte Skalierung */
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    90% { /* Bleibt sichtbar */
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% { /* Ausblenden */
+        opacity: 0;
+        transform: translateY(-30px) scale(0.95);
+    }
+}
+
+/* --- Stile für das Straßen-Statistik Modal --- */
+.modal-overlay {
+    display: none; /* Standardmäßig versteckt */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Halbtransparenter Hintergrund */
+    z-index: 2000; /* Über anderen Elementen */
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.modal-content {
+    background-color: var(--card-bg);
+    padding: 25px;
+    border-radius: var(--border-radius-large);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    width: 100%;
+    max-width: 450px; /* Maximale Breite des Modals */
+    position: relative; /* Für den Schließen-Button */
+    animation: fadeInModal 0.3s ease-out;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-close-button {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 2rem; /* Größerer Schließen-Button */
+    color: var(--text-color-muted);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+.modal-close-button:hover {
+    color: var(--text-color);
+}
+
+.modal-stats-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--card-border);
+    font-size: 0.95em;
+}
+.modal-stats-item:last-child {
+    border-bottom: none;
+}
+.modal-stats-item strong {
+    color: var(--text-color);
+}
+.modal-stats-item span {
+    color: var(--text-color-light);
+    font-weight: 500;
+}
+
+/* ... existing code ... */
+/* ENDE: Zeiterfassung (Calendar View) */
+
+
+/* NEU: Horizontale Fortschrittsleiste im Statistik-Modal */
+.horizontal-progress-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 10px; /* Abstand zwischen Leiste und Prozentzahl */
+}
+
+.horizontal-progress-bar-background {
+    flex-grow: 1; /* Nimmt den verfügbaren Platz ein */
+    height: 12px; /* Höhe der Leiste */
+    background-color: var(--border-color-soft, #e9ecef); /* Hintergrund der Leiste */
+    border-radius: 6px; /* Abgerundete Ecken */
+    overflow: hidden; /* Stellt sicher, dass der Füllbalken innerhalb bleibt */
+    position: relative;
+}
+
+.horizontal-progress-bar-fill {
+    height: 100%;
+    width: 0%; /* Startet bei 0% */
+    background-color: var(--text-color-muted, #6c757d); /* Standardfarbe, wird per JS angepasst */
+    border-radius: 6px;
+    transition: width 0.5s ease-out, background-color 0.5s ease-out; /* Sanfter Übergang */
+}
+
+.horizontal-progress-percentage {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: var(--text-color-muted, #6c757d); /* Standardfarbe, wird per JS angepasst */
+    min-width: 40px; /* Stellt sicher, dass genug Platz für z.B. "100%" ist */
+    text-align: right;
+}
+
+/* In styles.css hinzufügen */
+.large-admin-button {
+    padding: 12px 25px;
+    font-size: 1.1em;
+    width: 100%; /* Volle Breite */
+    max-width: none; /* Keine maximale Breite mehr */
+    margin-top: 0; /* Kein oberer Rand, da Container ihn positioniert */
+    display: inline-flex; /* Für Icon und Text */
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-sizing: border-box; /* Wichtig, damit Padding in 100% Breite passt */
+}
+
+.large-admin-button .material-icons {
+    font-size: 1.3em; /* Icon etwas größer */
+}
+
+/* Optional: Styling für den Container, falls er direkt in statsView ist und nicht in statsContent */
+#adminButtonContainerStats {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0; /* Kein Innenabstand, da Button 100% Breite hat */
+    margin-bottom: 15px; /* Abstand zum nächsten Element (Skeleton oder Inhalt) */
+    /* text-align: center; -- Nicht mehr benötigt, wenn Button 100% Breite hat */
+}
+
+.view-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color-soft);
+    margin-bottom: 15px;
+    background-color: var(--card-bg); /* Leichter Hintergrund für den Header-Bereich */
+}
+
+.view-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+    color: var(--text-color-headings);
+}
+
+.back-buttonnumpad { /* Wiederverwendung und Anpassung */
+    margin-right: 15px;
+    background-color: var(--button-secondary-bg);
+    color: var(--button-secondary-text);
+    border: 1px solid var(--button-secondary-border);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.back-buttonnumpad:hover {
+    background-color: var(--button-secondary-hover-bg);
+}
+
+
+/* Arbeitszeitauswertung View spezifisch */
+#workTimeEvaluationView .view-content {
+    padding: 15px;
+}
+
+.evaluation-user-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px; /* Begrenzte Höhe mit Scrollbalken, falls viele User */
+    overflow-y: auto;
+    border: 1px solid var(--border-color-soft);
+    border-radius: 8px;
+}
+
+.evaluation-user-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color-soft);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-size: 0.95em;
+}
+
+.evaluation-user-item:last-child {
+    border-bottom: none;
+}
+
+.evaluation-user-item:hover {
+    background-color: var(--hover-bg-light);
+}
+
+#userDetailEvalContainer h4 {
+    color: var(--text-color-headings);
+    border-bottom: 1px solid var(--primary-color-light);
+    padding-bottom: 8px;
+}
+
+.monthly-work-table {
+    width: 100%;
+    margin-top: 15px;
+    border-collapse: collapse; /* Für saubere Linien */
+}
+
+.monthly-work-table th,
+.monthly-work-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color-soft);
+}
+
+.monthly-work-table th {
+    background-color: var(--table-header-bg);
+    color: var(--table-header-text);
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.monthly-work-table tbody tr:hover {
+    background-color: var(--hover-bg-light);
+}
+
+/* Skeleton für Mitarbeiterliste (Beispiel) */
+.skeleton-list-item {
+    height: 48px; /* Höhe eines Listenelements */
+    background-color: var(--skeleton-bg);
+    border-radius: 4px;
+}
+
+/* Skeleton für Monatstabelle (Beispiel) */
+.skeleton-table-row {
+    height: 45px; /* Höhe einer Tabellenzeile */
+    background-color: var(--skeleton-bg);
+    margin-bottom: 6px;
+    border-radius: 4px;
+}
+.loading-placeholder .skeleton-table-row:last-child {
+    margin-bottom: 0;
+}
+
+.error-message {
+    color: var(--danger-color);
+    padding: 10px;
+    background-color: var(--danger-bg-light);
+    border: 1px solid var(--danger-color);
+    border-radius: 5px;
+    text-align: center;
+}
+
+.monthly-work-table th:last-child, /* Für die "Details" Spalte */
+.monthly-work-table td:last-child {
+    text-align: center;
+    width: 80px; /* Breite für den Toggle-Button */
+}
+
+.toggle-details-button .material-icons {
+    transition: transform 0.2s ease-in-out;
+}
+
+.daily-detail-row.hidden-row {
+    display: none;
+}
+
+.daily-detail-container {
+    padding: 15px 20px;
+    background-color: var(--bg-color); /* Etwas hellerer Hintergrund für die Details */
+    border-top: 1px dashed var(--card-border); /* Trennlinie */
+}
+
+.no-daily-entries {
+    padding: 10px;
+    text-align: center;
+    color: var(--text-color-muted);
+    font-style: italic;
+}
+
+.day-entry-group {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    /* border-bottom: 1px solid var(--card-border); /* Leichte Trennung zwischen Tagen */
+}
+.day-entry-group:last-child {
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+.day-entry-header {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--primary-color-light);
+}
+
+.daily-entries-list {
+    list-style: none;
+    padding-left: 0; /* Kein Standard-Einzug für ul */
+}
+
+.time-entry-li-detailed {
+    padding: 10px;
+    margin-bottom: 8px;
+    background-color: var(--input-bg); /* Hintergrund wie normale Eingabefelder */
+    border: 1px solid var(--card-border);
+    border-radius: var(--border-radius-std);
+    font-size: 0.9em;
+}
+
+.time-entry-li-detailed .time-entry-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.time-entry-times strong {
+    font-weight: 500;
+}
+.time-entry-duration-detailed {
+    font-size: 0.9em;
+    color: var(--text-color-muted);
+}
+
+.time-entry-locations {
+    display: flex;
+    gap: 10px; /* Abstand zwischen den Buttons/Texten */
+    flex-wrap: wrap; /* Umbruch bei Bedarf */
+    margin-top: 5px;
+}
+
+.location-button {
+    padding: 5px 10px !important; /* Wichtig, um andere Button-Stile zu überschreiben */
+    font-size: 0.85em !important;
+    background-color: var(--button-secondary-bg) !important;
+    color: var(--button-secondary-text-color) !important;
+    border: 1px solid var(--button-secondary-border) !important;
+    min-width: auto !important; /* Button nicht strecken */
+}
+.location-button:hover {
+    background-color: var(--button-secondary-hover-bg) !important;
+}
+.location-button .material-icons {
+    font-size: 1.1em !important; /* Kleinere Icons in den Buttons */
+    vertical-align: -2px;
+}
+.location-text {
+    font-size: 0.85em;
+    color: var(--text-color-light);
+    padding: 5px 0;
+}
+
+/* ... restliche CSS-Stile ... */

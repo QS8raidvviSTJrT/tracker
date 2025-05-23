@@ -2,18 +2,29 @@ const supabaseUrl = 'https://pvjjtwuaofclmsvsaneo.supabase.co'
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2amp0d3Vhb2ZjbG1zdnNhbmVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4NzM2OTksImV4cCI6MjA2MjQ0OTY5OX0.yc4F3gKDGKMmws60u3KOYSM8t06rvDiJgOvEAuiYRa8'
         const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
+        
+
         // NEU: LocalStorage Keys
         const LS_STREET_CACHE_KEY = 'doorTrackerStreetCache';
         const LS_ACTIVE_STREET_DETAIL_KEY = 'doorTrackerActiveStreetDetail';
         const LS_LAST_OPENED_STREET_KEY = 'doorTrackerLastOpenedStreet'; // NEU
         const LS_COLOR_SCHEME_KEY = 'doorTrackerColorScheme'; // NEU für Farbschema
 
+        // Cache für Overpass-Daten (Gesamtzahl Hausnummern) - Sicherstellen, dass es global ist
+        const totalHouseNumbersCache = new Map();
+        const TOTAL_HN_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 Stunden in Millisekunden
+
+        // Globale Daten für den Straßenfortschritt
+        let streetProgressData = new Map(); // Key: "PLZ-Straßenname", Value: { processedCount: number, percentCompletedFromDB: number | null }
+
         // NEU: LocalStorage Helper Functions
         function saveToLocalStorage(key, data) {
             try {
                 localStorage.setItem(key, JSON.stringify(data));
             } catch (e) {
-                console.warn("Error saving to localStorage", key, e);
+                // console.warn("Error saving to localStorage", key, e);
+                showErrorNotification("Error saving to localStorage: " + key + " " + (e.message || e.toString()));
+                showErrorNotification("Fehler beim Speichern: " + (e.message || e.toString()));
             }
         }
 
@@ -22,7 +33,9 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
                 const data = localStorage.getItem(key);
                 return data ? JSON.parse(data) : null;
             } catch (e) {
-                console.warn("Error getting from localStorage", key, e);
+                // console.warn("Error getting from localStorage", key, e);
+                showErrorNotification("Error getting from localStorage: " + key + " " + (e.message || e.toString()));
+                showErrorNotification("Fehler beim Laden: " + (e.message || e.toString()));
                 return null;
             }
         }
@@ -31,7 +44,9 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
             try {
                 localStorage.removeItem(key);
             } catch (e) {
-                console.warn("Error removing from localStorage", key, e);
+                // console.warn("Error removing from localStorage", key, e);
+                showErrorNotification("Error removing from localStorage: " + key + " " + (e.message || e.toString()));
+                showErrorNotification("Fehler beim Entfernen: " + (e.message || e.toString()));
             }
         }
 
@@ -41,7 +56,8 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
         function applyColorScheme(scheme) {
             if (!['light', 'dark', 'system'].includes(scheme)) {
-                console.warn('Ungültiges Farbschema:', scheme);
+                // console.warn('Ungültiges Farbschema:', scheme);
+                showErrorNotification('Ungültiges Farbschema: ' + scheme);
                 scheme = 'system'; // Fallback
             }
 
@@ -67,7 +83,7 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
             }
 
             document.documentElement.setAttribute('data-theme', themeToSet);
-            console.log(`Farbschema angewendet: User-Auswahl='${scheme}', Tatsächlich='${themeToSet}'`);
+            //console.log(`Farbschema angewendet: User-Auswahl='${scheme}', Tatsächlich='${themeToSet}'`);
 
             // Aktualisiere das Select-Element, falls es existiert und sichtbar ist
             // Stelle sicher, dass colorSchemeSelect initialisiert wurde, bevor darauf zugegriffen wird
@@ -87,6 +103,8 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
         let deferredPrompt;
 let currentUser = null;
 let currentSelectedStreetId = null; // ID der aktuell ausgewählten Straße
+let currentSelectedStreetName = null; // NEU
+let currentSelectedPostalCode = null; // NEU
 let currentHouseEntries = []; // Einträge für die aktuell ausgewählte Straße
 let currentEditingEntryId = null; // ID des Eintrags, der gerade bearbeitet wird
 let statsChartInstance = null; // Variable für die Chart-Instanz
@@ -177,6 +195,24 @@ const settingsViewSkeleton = document.querySelector('.settings-view-skeleton');
 const calendarViewSkeleton = document.querySelector('.calendar-view-skeleton');
 const streetDetailSkeleton = document.querySelector('.street-detail-skeleton'); // NEU
 
+// NEU: Referenzen für Admin-View
+const adminSettingsButton = document.getElementById('adminSettingsButton');
+const adminView = document.getElementById('adminView');
+const adminViewSkeleton = document.querySelector('.admin-view-skeleton');
+const adminContent = document.getElementById('adminContent');
+const adminLoadingIndicator = document.getElementById('adminLoadingIndicator');
+const adminErrorDisplay = document.getElementById('adminErrorDisplay');
+
+// NEU: Referenzen für Arbeitszeitauswertung-View
+const workTimeEvaluationView = document.getElementById('workTimeEvaluationView');
+const workTimeEvalViewSkeleton = document.querySelector('.work-time-eval-view-skeleton');
+const userEvalList = document.getElementById('userEvalList');
+const userDetailEvalContainer = document.getElementById('userDetailEvalContainer');
+const userDetailEvalName = document.getElementById('userDetailEvalName');
+const monthlyWorkTimeTableContainer = document.getElementById('monthlyWorkTimeTableContainer');
+const monthlyWorkTimeSkeleton = document.getElementById('monthlyWorkTimeSkeleton');
+const userListForEvalContainer = document.getElementById('userListForEvalContainer'); // NEU
+
 // --- PWA Installationslogik ---
         function isIos() {
     const userAgent = navigator.userAgent;
@@ -239,17 +275,29 @@ function hideInitialLoadingOverlay() {
 // --- Session & Auth ---
 async function checkSession() {
     // Das Overlay ist standardmäßig sichtbar durch HTML/CSS
-    const { data: { session }, error } = await supabaseClient.auth.getSession();
-    if (error) {
-        console.error('Error checking session:', error.message);
-        showLogin(); // Zeige Login bei Fehler
-        return;
-    }
-    if (session) {
-        currentUser = session.user;
-        showApp();
-    } else {
-        showLogin();
+    try {
+        const { data: { session }, error } = await supabaseClient.auth.getSession();
+        if (error) {
+            console.error('Error checking session:', error);
+            if (isInvalidRefreshTokenError(error)) {
+                showErrorNotification("Ihre Sitzung ist abgelaufen. Bitte laden Sie die Seite neu, um sich erneut anzumelden.");
+                // showLogin() wird ohnehin aufgerufen, das Neuladen ist hier wichtiger.
+            }
+            showLogin(); // Zeige Login bei Fehler
+            return;
+        }
+        if (session) {
+            currentUser = session.user;
+            showApp();
+        } else {
+            showLogin();
+        }
+    } catch (catchError) { // Fängt Fehler ab, die von getSession selbst geworfen werden könnten
+        console.error('Unexpected critical error in checkSession:', catchError);
+        if (isInvalidRefreshTokenError(catchError)) {
+            showErrorNotification("Ihre Sitzung ist abgelaufen. Bitte laden Sie die Seite neu, um sich erneut anzumelden.");
+        }
+        showLogin(); // Im Zweifel immer zum Login
     }
     // Das Ausblenden des Overlays wird jetzt in showLogin() und showApp() gehandhabt
     // direkt nach der Entscheidung, was angezeigt wird.
@@ -274,10 +322,14 @@ function showLogin() {
     hideInitialLoadingOverlay(); // NEU: Overlay hier ausblenden
 }
 
-function showApp() {
+async function showApp() {
     loginContainer.style.display = 'none';
     appContainer.style.display = 'flex';
     hideInitialLoadingOverlay();
+
+    // WICHTIG: Lade alle Fortschrittsdaten aus der DB und fülle die globale Map
+    // Dies geschieht, bevor searchStreets oder displayStreets aufgerufen werden könnten.
+    // await fetchAllStreetProgressDataFromDB(); // ENTFERNT
 
     const activeDetail = getFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY);
 
@@ -316,10 +368,23 @@ function showApp() {
         if (cachedStreetData && cachedStreetData.lastPlz) {
             plzInput.value = cachedStreetData.lastPlz;
             // searchStreets() wird nun den Cache für Straßen prüfen oder API callen
+            // und displayStreets wird die frisch geladene globale streetProgressData Map verwenden
             searchStreets();
         } else {
             // Wenn keine letzte PLZ im Cache, versuche Standort
             getPostalCodeFromLocation();
+            // Wenn keine PLZ ermittelt werden kann, zeige den Platzhalter, aber warte nicht ewig.
+            if (!plzInput.value && streetListPlaceholder && streetListContainer) {
+                 setTimeout(() => {
+                     if (!plzInput.value && streetListContainer.children.length === 0) { // Nur wenn immer noch leer
+                         streetListContainer.innerHTML = ''; // Leeren, falls alter Inhalt da ist
+                         streetListContainer.appendChild(streetListPlaceholder);
+                         streetListPlaceholder.style.display = 'flex';
+                         if(alphabetFilterContainer) alphabetFilterContainer.style.display = 'none';
+                         loadingIndicator.style.display = 'none'; // Ladeindikator ausblenden
+                     }
+                 }, 5000); // 5 Sekunden Timeout für Standort
+            }
         }
         // Setze die mainView als aktiv und den Standardtitel, falls nicht schon durch Detailansicht geschehen
         // Dies ist wichtig, falls weder Detail noch Straßenliste gecached waren.
@@ -408,32 +473,33 @@ window.login = async function() {
     let fetchedCodeId = null; // Variable, um die code_id zu speichern
 
     try {
-        // 1. Prüfe den Registrierungscode via RPC
-        console.log("Versuche Registrierungscode zu prüfen via RPC:", registrationCodeValue);
-        const { data: validationResults, error: validationError } = await supabaseClient.rpc('validate_registration_code', {
-            p_code: registrationCodeValue
-        });
+        // 1. Prüfe den Registrierungscode direkt aus der Tabelle
+        console.log("Versuche Registrierungscode zu prüfen via direkter Tabellenabfrage:", registrationCodeValue);
+        const { data: codeData, error: validationError } = await supabaseClient
+            .from('registration_codes')
+            .select('id, code_value, is_used, used_by')
+            .eq('code_value', registrationCodeValue)
+            .maybeSingle();
 
         if (validationError) {
-            console.error('Supabase Fehler beim Aufrufen von validate_registration_code RPC:', validationError);
+            console.error('Supabase Fehler beim Prüfen des Registrierungscodes (Tabelle):', validationError);
             throw new Error('Fehler bei der Code-Prüfung. Versuche es später erneut.');
         }
+        console.log("Antwort von direkter Tabellenabfrage registration_codes:", codeData);
 
-        // Die RPC-Funktion gibt ein Array mit einem Objekt zurück
-        const result = validationResults && validationResults.length > 0 ? validationResults[0] : null;
-        console.log("Antwort von RPC validate_registration_code:", result);
-
-        if (!result || !result.is_valid) {
-            console.warn("Code nicht in der Datenbank gefunden (via RPC) für:", registrationCodeValue);
+        if (!codeData) {
+            // console.warn("Code nicht in der Datenbank gefunden für:", registrationCodeValue);
+            showErrorNotification("Code nicht in der Datenbank gefunden für: " + registrationCodeValue);
             throw new Error('Ungültiger Registrierungscode.');
         }
 
-        if (result.is_used) {
-            console.warn("Der Code", registrationCodeValue, "wurde bereits verwendet (via RPC).");
+        if (codeData.is_used || codeData.used_by) {
+            // console.warn("Der Code", registrationCodeValue, "wurde bereits verwendet.");
+            showErrorNotification("Der Code " + registrationCodeValue + " wurde bereits verwendet.");
             throw new Error('Dieser Registrierungscode wurde bereits verwendet.');
         }
 
-        fetchedCodeId = result.code_id; // Speichere die ID des gültigen, unbenutzten Codes
+        fetchedCodeId = codeData.id;
 
         // 2. Registriere den Benutzer
         console.log("Code ist gültig und unbenutzt. Versuche Benutzer zu registrieren...");
@@ -445,25 +511,26 @@ window.login = async function() {
 
         console.log("Benutzer erfolgreich registriert:", signUpData.user.email, "User ID:", signUpData.user.id);
 
-        // 3. Markiere den Code als benutzt via RPC
+        // 3. Markiere den Code als benutzt durch direktes Update
         if (!fetchedCodeId) {
-            // Sollte nicht passieren, wenn die Logik oben korrekt ist
             console.error("KRITISCH: fetchedCodeId ist null, kann Code nicht als benutzt markieren.");
             throw new Error("Interner Fehler: Code-ID nicht gefunden nach Validierung.");
         }
 
-        console.log("Versuche Code als benutzt zu markieren via RPC für Code ID:", fetchedCodeId, "User ID:", signUpData.user.id);
-        const { error: claimError } = await supabaseClient.rpc('claim_registration_code', {
-            p_code_id: fetchedCodeId,
-            p_user_id: signUpData.user.id
-        });
+        console.log("Versuche Code als benutzt zu markieren (direktes Update) für Code ID:", fetchedCodeId, "User ID:", signUpData.user.id);
+        const { error: claimError } = await supabaseClient
+            .from('registration_codes')
+            .update({
+                is_used: true,
+                used_by: signUpData.user.id,
+                used_at: new Date().toISOString()
+            })
+            .eq('id', fetchedCodeId);
 
         if (claimError) {
-            // Dies ist ein kritischer Punkt. Der User wurde erstellt, aber der Code konnte nicht als benutzt markiert werden.
-            // Hier sollte Logging erfolgen und ggf. eine manuelle Korrektur.
-            console.error('KRITISCH: User erstellt, aber Code konnte nicht via RPC als "benutzt" markiert werden:', claimError);
+            console.error('KRITISCH: User erstellt, aber Code konnte nicht (direktes Update) als "benutzt" markiert werden:', claimError);
         } else {
-            console.log("Code erfolgreich als benutzt markiert via RPC.");
+            console.log("Code erfolgreich als benutzt markiert (direktes Update).");
         }
 
         alert('Registrierung erfolgreich! Bitte E-Mail-Adresse bestätigen und erneut einloggen.');
@@ -575,7 +642,9 @@ window.locateMe = async function() {
             showError("PLZ konnte für Ihren Standort nicht ermittelt werden.");
         }
     } catch (error) {
-        console.warn("Fehler bei der Standortabfrage oder PLZ-Ermittlung:", error);
+        showErrorNotification("Fehler bei der Standortabfrage oder PLZ-Ermittlung: " + (error.message || error.toString()));
+        // console.warn("Fehler bei der Standortabfrage oder PLZ-Ermittlung:", error);
+        showErrorNotification("Fehler bei der Standortabfrage oder PLZ-Ermittlung: " + (error.message || error.toString()));
         let errorMessage = "Standort konnte nicht abgerufen werden.";
         if (error.code) {
             switch (error.code) {
@@ -623,7 +692,8 @@ async function getPostalCodeFromLocation() {
                     searchStreets();
                 }
             } catch (error) {
-                console.warn("Fehler beim Reverse Geocoding:", error);
+                // console.warn("Fehler beim Reverse Geocoding:", error);
+                showErrorNotification("Fehler beim Reverse Geocoding: " + (error.message || error.toString()));
                 // Fehler wird von reverseGeocode schon geloggt, hier evtl. User-Feedback?
                 showError("PLZ konnte für Ihren Standort nicht ermittelt werden.");
             } finally {
@@ -635,6 +705,7 @@ async function getPostalCodeFromLocation() {
         },
         (error) => {
             console.warn("Standortabfrage fehlgeschlagen:", error.message);
+            //showErrorNotification("Standortabfrage fehlgeschlagen: " + error.message);
             let errorMessage = "Standort konnte nicht abgerufen werden.";
              if (error.code) {
                 switch (error.code) {
@@ -710,6 +781,8 @@ async function searchStreets() {
         console.log("Loading streets from localStorage for PLZ:", plz);
         if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
         streetListContainer.innerHTML = ''; // Leeren für neue Liste
+        // ENTFERNT: await fetchAllStreetProgressDataFromDB(); 
+        // displayStreets verwendet jetzt die globale streetProgressData Map, die beim App-Start gefüllt wurde.
         displayStreets(cachedData.streets, plz); // Straßen aus Cache anzeigen
         streetListContainer.style.display = 'flex'; // Sicherstellen, dass Container sichtbar ist
         return; // Frühzeitiger Ausstieg
@@ -757,7 +830,7 @@ async function searchStreets() {
         console.error('Fehler beim Abrufen der Straßen:', error);
         showError(`Fehler beim Abrufen der Straßen: ${error.message}.`);
         if (error.message.includes("timeout") || error.message.includes("load") || error.message.includes("überlastet")) {
-            showError(errorDisplay.textContent + " API überlastet? Später erneut versuchen.");
+            showError(errorDisplay.textContent + " API überlastet. Später erneut versuchen.");
         }
         // === PLATZHALTER BLEIBT AUSGEBLENDET, DA FEHLER ANGEZEIGT WIRD ===
         streetListContainer.style.display = 'none'; // Liste bleibt bei Fehler aus
@@ -803,65 +876,52 @@ async function fetchStreetsWithOverpass(url, query) {
 
 
 function displayStreets(streets, postalCode) {
-    streetListContainer.innerHTML = ''; // Leert die eigentliche Straßenliste
+    streetListContainer.innerHTML = '';
     const parent = streetListContainer.parentNode;
 
-    // 1. Alphabet-Filter vorbereiten/anzeigen
     if (alphabetFilterContainer) {
-        alphabetFilterContainer.innerHTML = ''; 
-        alphabetFilterContainer.style.display = 'none'; 
+        alphabetFilterContainer.innerHTML = '';
+        alphabetFilterContainer.style.display = 'none';
     }
 
-    if (streets.length > 0) {
-        renderAlphabetFilter(); 
-        if (alphabetFilterContainer) alphabetFilterContainer.style.display = 'flex'; 
-    }
-
-    // 2. "Zuletzt geöffnet" Element verwalten
+    // "Zuletzt geöffnet" Logik (unverändert, aber nach der Initialisierung von streetProgressData)
     const lastOpenedStreetData = getFromLocalStorage(LS_LAST_OPENED_STREET_KEY);
-
     if (lastOpenedStreetElementContainer && lastOpenedStreetElementContainer.parentNode === parent) {
         parent.removeChild(lastOpenedStreetElementContainer);
-        lastOpenedStreetElementContainer = null; 
+        lastOpenedStreetElementContainer = null;
     }
-
     if (lastOpenedStreetData && lastOpenedStreetData.postalCode === postalCode) {
+        // ... (Code für "Zuletzt geöffnet" Button bleibt hier) ...
         lastOpenedStreetElementContainer = document.createElement('div');
-        lastOpenedStreetElementContainer.className = 'last-opened-street-button'; // Beibehaltung der Klasse für Basis-Styling
+        lastOpenedStreetElementContainer.className = 'last-opened-street-button'; 
 
-        // Zusätzliches Styling für Gradient und Pfeil
         lastOpenedStreetElementContainer.style.background = 'linear-gradient(135deg, var(--primary-color-light, #79bbff) 0%, var(--primary-color, #0d6efd) 100%)';
         lastOpenedStreetElementContainer.style.color = 'white';
         lastOpenedStreetElementContainer.style.display = 'flex';
         lastOpenedStreetElementContainer.style.justifyContent = 'space-between';
         lastOpenedStreetElementContainer.style.alignItems = 'center';
-        lastOpenedStreetElementContainer.style.padding = '8px 15px'; // Padding reduziert für geringere Höhe
-        lastOpenedStreetElementContainer.style.borderRadius = '8px'; // Abgerundete Ecken
-        // lastOpenedStreetElementContainer.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'; // Entfernt
+        lastOpenedStreetElementContainer.style.padding = '8px 15px'; 
+        lastOpenedStreetElementContainer.style.borderRadius = '8px'; 
         lastOpenedStreetElementContainer.style.cursor = 'pointer';
-        lastOpenedStreetElementContainer.style.transition = 'transform 0.2s ease-out'; // Box-shadow transition entfernt
+        lastOpenedStreetElementContainer.style.transition = 'transform 0.2s ease-out'; 
 
-        // Hover-Effekt ohne Schatten
         lastOpenedStreetElementContainer.onmouseover = function() {
             this.style.transform = 'translateY(-2px)';
-            // this.style.boxShadow = '0 6px 12px rgba(0,0,0,0.2)'; // Entfernt
         };
         lastOpenedStreetElementContainer.onmouseout = function() {
             this.style.transform = 'translateY(0)';
-            // this.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'; // Entfernt
         };
         
         const streetNameDisplay = lastOpenedStreetData.streetName.length > 30 
             ? escapeHtml(lastOpenedStreetData.streetName.substring(0, 27)) + "..." 
             : escapeHtml(lastOpenedStreetData.streetName);
         
-        // HTML-Struktur für Text und Pfeil
         lastOpenedStreetElementContainer.innerHTML = 
             `<div style="display: flex; flex-direction: column;">
                 <span style="font-size: 0.75em; opacity: 0.9; line-height: 1.2;">Zuletzt geöffnet:</span>
                 <span style="font-weight: 500; font-size: 0.9em; line-height: 1.2;">${streetNameDisplay}</span>
             </div>
-            <span class="material-icons" style="font-size: 24px; opacity: 0.9;">chevron_right</span>`; // Pfeilgröße leicht reduziert
+            <span class="material-icons" style="font-size: 24px; opacity: 0.9;">chevron_right</span>`; 
         
         lastOpenedStreetElementContainer.title = `Gehe zu: ${escapeHtml(lastOpenedStreetData.streetName)}`;
         
@@ -870,28 +930,70 @@ function displayStreets(streets, postalCode) {
         if (parent) {
             parent.insertBefore(lastOpenedStreetElementContainer, streetListContainer);
         }
+
     }
 
-    // 3. Straßen in die Liste füllen
+
     if (streets.length > 0) {
-         streets.forEach(streetName => {
+        if (alphabetFilterContainer) { // Alphabet-Filter nur anzeigen, wenn Straßen vorhanden sind
+            renderAlphabetFilter();
+            alphabetFilterContainer.style.display = 'flex';
+        }
+
+         streets.forEach(streetNameInput => { // streetNameInput kann String oder Objekt sein
+            const streetName = typeof streetNameInput === 'object' && streetNameInput.name ? streetNameInput.name : streetNameInput;
+
             const streetElement = document.createElement('div');
-            streetElement.textContent = streetName;
             streetElement.className = 'street-item';
             streetElement.onclick = () => selectStreet(streetName, postalCode);
+
+            const streetNameSpan = document.createElement('span');
+            streetNameSpan.className = 'street-item-name';
+            streetNameSpan.textContent = streetName;
+            streetElement.appendChild(streetNameSpan);
+
+            // const progressIndicatorContainer = document.createElement('div'); // ENTFERNT
+            // progressIndicatorContainer.className = 'street-item-progress'; // ENTFERNT
+
+            // progressIndicatorContainer.innerHTML = ` // ENTFERNT
+            //     <svg class="progress-ring" width="20" height="20" viewBox="0 0 20 20">
+            //         <circle class="progress-ring__background" r="8" cx="10" cy="10"/>
+            //         <circle class="progress-ring__circle" r="8" cx="10" cy="10"/>
+            //     </svg>
+            //     <span class="progress-percentage">--%</span>
+            // `; // ENTFERNT
+            // streetElement.appendChild(progressIndicatorContainer); // ENTFERNT
+
+            // Lese Fortschritt aus der globalen streetProgressData Map // ENTFERNT
+            // const streetKey = `${postalCode}-${streetName}`; // ENTFERNT
+            // const progressInfo = streetProgressData.get(streetKey); // ENTFERNT
+
+            // if (progressInfo) { // ENTFERNT
+            //     // percentCompletedFromDB kann null sein, updateStreetProgressUI behandelt das
+            //     updateStreetProgressUI(progressIndicatorContainer, { // ENTFERNT
+            //         processedCount: progressInfo.processedCount,  // ENTFERNT
+            //         totalCount: null, // Wird nicht benötigt, da wir uns auf directPercentage verlassen // ENTFERNT
+            //         directPercentage: progressInfo.percentCompletedFromDB // ENTFERNT
+            //     });
+            // } else { // ENTFERNT
+            //     // Falls keine Daten in der globalen Map für diese Straße
+            //     updateStreetProgressUI(progressIndicatorContainer, { // ENTFERNT
+            //         processedCount: 0, // ENTFERNT
+            //         totalCount: null, // ENTFERNT
+            //         directPercentage: null  // ENTFERNT
+            //     });
+            //      console.warn(`Keine Fortschrittsdaten in globaler Map für ${streetKey} beim Anzeigen der Straßenliste.`); // ENTFERNT
+            // }
             streetListContainer.appendChild(streetElement);
          });
-         // Nach dem Füllen der Liste den Alphabet-Filter ggf. neu initialisieren/filtern
-         // Dies stellt sicher, dass der Filter auf die frisch geladene Liste angewendet wird.
-         if (currentAlphabetFilter) { // currentAlphabetFilter wird in renderAlphabetFilter ggf. auf 'Alle' gesetzt
+
+         if (currentAlphabetFilter) {
              filterStreetsByLetter(currentAlphabetFilter);
          } else {
-             filterStreetsByLetter('Alle'); // Fallback, sollte durch renderAlphabetFilter abgedeckt sein
+             filterStreetsByLetter('Alle');
          }
     } else {
-        // `streetListContainer` ist bereits leer.
-        // Die Nachricht "Keine Straßen für diese PLZ gefunden" wird nur angezeigt,
-        // wenn auch das "Zuletzt geöffnet"-Element nicht da ist.
+        if (alphabetFilterContainer) alphabetFilterContainer.style.display = 'none'; // Kein Filter wenn keine Straßen
         if (!lastOpenedStreetElementContainer && streetListContainer.children.length === 0) {
             streetListContainer.innerHTML = '<p style="text-align: center; padding: 20px;">Keine Straßen für diese PLZ gefunden.</p>';
         }
@@ -906,8 +1008,6 @@ async function selectStreet(streetName, postalCode) {
     clearError();
 
     // Bestehende Logik zum Entfernen des "Zuletzt geöffnet"-Buttons, falls dieser geklickt wurde.
-    // Diese kann bestehen bleiben, da sie spezifisch den Fall behandelt, dass der Button selbst geklickt wird
-    // und lastOpenedStreetElementContainer korrekt auf null setzt.
     const lastOpenedStreetDataForRemoval = getFromLocalStorage(LS_LAST_OPENED_STREET_KEY);
     if (lastOpenedStreetElementContainer &&
         lastOpenedStreetDataForRemoval &&
@@ -916,41 +1016,34 @@ async function selectStreet(streetName, postalCode) {
         if (lastOpenedStreetElementContainer.parentNode) {
             lastOpenedStreetElementContainer.parentNode.removeChild(lastOpenedStreetElementContainer);
         }
-        lastOpenedStreetElementContainer = null; 
+        lastOpenedStreetElementContainer = null;
     }
 
     // Echten Inhaltscontainer ausblenden und leeren
     if (streetDetailContainer) {
         streetDetailContainer.style.display = 'none';
-        streetDetailContainer.innerHTML = ''; 
+        streetDetailContainer.innerHTML = '';
     }
     // Skeleton anzeigen
-    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'block'; 
+    if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'block';
 
     // Andere UI-Elemente anpassen
     if (streetListContainer) streetListContainer.style.display = 'none';
     if (alphabetFilterContainer) {
         alphabetFilterContainer.style.display = 'none'; // Alphabet-Filter ausblenden
     }
-    
-    // NEU: "Zuletzt geöffnet"-Button IMMER entfernen, wenn in die Detailansicht gewechselt wird.
-    // displayStreets() wird ihn bei Bedarf neu erstellen, wenn zur Liste zurückgekehrt wird.
+
     if (lastOpenedStreetElementContainer && lastOpenedStreetElementContainer.parentNode) {
         lastOpenedStreetElementContainer.parentNode.removeChild(lastOpenedStreetElementContainer);
-        // Wichtig: Setze die globale Referenz auch hier auf null, damit sie nicht
-        // fälschlicherweise in anderen Kontexten als noch existent betrachtet wird,
-        // bis displayStreets sie ggf. neu erstellt.
         lastOpenedStreetElementContainer = null;
     }
-    
-    currentSortOrder = getFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY)?.sortOrder || 'house_number_asc'; // Sortierung ggf. aus Cache wiederherstellen
+
+    currentSortOrder = getFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY)?.sortOrder || 'house_number_asc';
 
     try {
-        // 1. Prüfen, ob Straße global existiert (ohne user_id Filter)
         let { data: existingStreet, error: fetchError } = await supabaseClient
             .from('streets')
             .select('id')
-            // .eq('user_id', currentUser.id) // ENTFERNT: Straßen sind global
             .eq('name', streetName)
             .eq('postal_code', postalCode)
             .maybeSingle();
@@ -963,17 +1056,11 @@ async function selectStreet(streetName, postalCode) {
         if (existingStreet) {
             currentSelectedStreetId = existingStreet.id;
         } else {
-            // Straße neu global anlegen (ohne user_id)
             const { data: newStreet, error: insertError } = await supabaseClient
                 .from('streets')
-                .insert({
-                    // user_id: currentUser.id, // ENTFERNT: Straßen haben keinen direkten User-Besitzer mehr
-                    name: streetName,
-                    postal_code: postalCode
-                })
+                .insert({ name: streetName, postal_code: postalCode })
                 .select('id')
                 .single();
-
             if (insertError) {
                 console.error("Supabase insertError (streets insert):", JSON.stringify(insertError, null, 2));
                 throw insertError;
@@ -982,26 +1069,27 @@ async function selectStreet(streetName, postalCode) {
             console.log(`Straße "${streetName}" (${postalCode}) mit ID ${currentSelectedStreetId} global neu angelegt.`);
         }
 
-        // 2. Lade Hausnummern-Einträge für diese globale Straße
+        currentSelectedStreetName = streetName; // NEU: Namen speichern
+        currentSelectedPostalCode = postalCode; // NEU: PLZ speichern
+
         await loadHouseEntries(currentSelectedStreetId);
-
-        // 3. Zeige Detailansicht mit Hausnummern-Interface
         renderStreetDetailView(streetName); // Rendert den Inhalt in streetDetailContainer
-        
-        // 4. Echten Inhalt anzeigen und Skeleton ausblenden
-        if (streetDetailContainer) streetDetailContainer.style.display = 'block'; 
-        if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none'; 
 
-        // NEU: Zuletzt geöffnete Straße speichern (unabhängig von der Detailansicht)
+        if (streetDetailContainer) streetDetailContainer.style.display = 'block';
+        if (streetDetailSkeleton) streetDetailSkeleton.style.display = 'none';
+
         saveToLocalStorage(LS_LAST_OPENED_STREET_KEY, { streetName, postalCode });
-
-        // Aktive Detailansicht im localStorage speichern
         saveToLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY, {
             streetId: currentSelectedStreetId,
             streetName: streetName,
             postalCode: postalCode,
-            sortOrder: currentSortOrder // Aktuelle Sortierung mitspeichern
+            sortOrder: currentSortOrder
         });
+
+        // NEU: Fortschritt berechnen und speichern, nachdem Einträge geladen wurden // ENTFERNT
+        // if (currentSelectedStreetId && currentSelectedStreetName && currentSelectedPostalCode) { // ENTFERNT
+        // await calculateAndUpdateStreetProgress(currentSelectedStreetId, currentSelectedStreetName, currentSelectedPostalCode); // ENTFERNT
+        // } // ENTFERNT
 
     } catch (error) {
         console.error('Fehler beim Auswählen/Anlegen der Straße oder Laden der Einträge:', error);
@@ -1062,16 +1150,35 @@ function renderStreetDetailView(streetName) {
     streetDetailContainer.innerHTML = ''; // Container leeren
     streetDetailContainer.style.display = 'block';
 
-    // Überschrift und Zurück-Button
+    // Header-Div für Zurück-Button und Auswertungs-Button
     const headerDiv = document.createElement('div');
     headerDiv.style.display = 'flex';
+    headerDiv.style.justifyContent = 'space-between'; // Buttons an den Enden platzieren
     headerDiv.style.alignItems = 'center';
     headerDiv.style.marginBottom = '20px';
-    headerDiv.innerHTML = `
-        <button onclick="backToStreetList()" class="buttonnumpad" style="padding: 5px 10px; width:auto; height:auto; font-size: 0.9em; ">Zurück</button>
-    `;
-    // <h4 id="selectedStreetName" style="text-align: center; flex-grow: 1;">${streetName}</h4>
+
+    const backButton = document.createElement('button');
+    backButton.onclick = backToStreetList;
+    backButton.className = 'buttonnumpad'; // Wiederverwendung von Stilen
+    backButton.style.padding = '5px 10px';
+    backButton.style.width = 'auto';
+    backButton.style.height = 'auto';
+    backButton.style.fontSize = '0.9em';
+    backButton.textContent = 'Zurück';
+    headerDiv.appendChild(backButton);
+
+    const statsButton = document.createElement('button');
+    statsButton.onclick = showStreetStatsModal;
+    statsButton.className = 'buttonnumpad'; // Wiederverwendung von Stilen
+    statsButton.style.padding = '5px 10px';
+    statsButton.style.width = 'auto';
+    statsButton.style.height = 'auto';
+    statsButton.style.fontSize = '0.9em';
+    statsButton.innerHTML = '<span class="material-icons" style="font-size: 1.2em; vertical-align: middle;">query_stats</span> Auswertung';
+    headerDiv.appendChild(statsButton);
+
     streetDetailContainer.appendChild(headerDiv);
+
 
     // Eingabeformular
     const formDiv = document.createElement('div');
@@ -1172,6 +1279,34 @@ function renderStreetDetailView(streetName) {
 
     // Einträge in die Liste rendern (initial sortiert nach currentSortOrder)
     sortAndDisplayHouseEntries();
+
+    // NEU: Modal-Grundgerüst für Straßenstatistiken hinzufügen (initial versteckt)
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'streetStatsModalOverlay';
+    modalOverlay.className = 'modal-overlay';
+    modalOverlay.onclick = (event) => { // Schließen bei Klick auf Overlay
+        if (event.target === modalOverlay) {
+            hideStreetStatsModal();
+        }
+    };
+
+    const modalContent = document.createElement('div');
+    modalContent.id = 'streetStatsModalContent';
+    modalContent.className = 'modal-content';
+    modalContent.innerHTML = `
+        <button id="streetStatsModalCloseButton" class="modal-close-button">&times;</button>
+        <h4 id="streetStatsModalTitle" style="margin-top:0; margin-bottom: 20px; text-align:center;">Straßenauswertung</h4>
+        <div id="streetStatsModalBody">
+            <p>Lade Daten...</p>
+        </div>
+    `;
+    modalOverlay.appendChild(modalContent);
+    streetDetailContainer.appendChild(modalOverlay);
+
+    const modalCloseButton = modalContent.querySelector('#streetStatsModalCloseButton');
+    if (modalCloseButton) {
+        modalCloseButton.onclick = hideStreetStatsModal;
+    }
 }
 
 // NEUE FUNKTION: Sortiert die currentHouseEntries und ruft displayHouseEntries auf
@@ -1353,9 +1488,19 @@ async function saveOrUpdateHouseEntry() {
         await loadHouseEntries(currentSelectedStreetId); 
         sortAndDisplayHouseEntries(); // Statt displayHouseEntries direkt aufzurufen
 
+        // NEU: Fortschritt der Straße neu berechnen und speichern // ENTFERNT
+        // if (currentSelectedStreetId && currentSelectedStreetName && currentSelectedPostalCode) { // ENTFERNT
+        //     await calculateAndUpdateStreetProgress(currentSelectedStreetId, currentSelectedStreetName, currentSelectedPostalCode); // ENTFERNT
+        // } // ENTFERNT
+
     } catch (error) {
         console.error("Fehler beim Speichern/Aktualisieren:", error);
-        showError(`Fehler beim Speichern: ${error.message}`);
+        if (isInvalidRefreshTokenError(error)) {
+            showErrorNotification("Ihre Sitzung ist abgelaufen. Bitte laden Sie die Seite neu, um fortzufahren.");
+            // Optional: Weitere Aktionen, z.B. showLogin(), aber das Neuladen ist oft ausreichend.
+        } else {
+            showError(`Fehler beim Speichern: ${error.message}`);
+        }
         if (saveButton) { // Fehler auch am Button anzeigen oder zurücksetzen
             saveButton.textContent = originalButtonText;
             saveButton.disabled = false;
@@ -1404,24 +1549,59 @@ async function deleteHouseEntry(entryId) {
     loadingIndicator.style.display = 'block';
 
     try {
-            // WICHTIG: Die user_id Bedingung bleibt hier bestehen,
-            // da nur der Ersteller des Eintrags löschen darf.
-            // Die Supabase Policy für DELETE muss 'auth.uid() = user_id' (Spalte im Eintrag) sein.
-            const { error } = await supabaseClient
+        // 1. Eintrag abrufen, um den Ersteller zu überprüfen
+        const { data: entry, error: fetchError } = await supabaseClient
+            .from('house_entries')
+            .select('creator_id') // Stellt sicher, dass die Spalte für den Ersteller 'creator_id' heißt
+            .eq('id', entryId)
+            .single();
+
+        if (fetchError) {
+            console.error("Fehler beim Abrufen des Eintrags vor dem Löschen:", fetchError);
+            throw fetchError; // Wird vom catch-Block behandelt
+        }
+
+        if (!entry) {
+            // console.warn(`Eintrag mit ID ${entryId} zum Löschen nicht gefunden.`);
+            showErrorNotification(`Eintrag mit ID ${entryId} zum Löschen nicht gefunden.`);
+            throw new Error("Eintrag nicht gefunden oder bereits gelöscht."); // Wird vom catch-Block behandelt
+        }
+
+        // Überprüfe, ob der aktuelle Benutzer der Ersteller ist
+        // Die Spalte `creator_id` muss beim Erstellen des Eintrags korrekt gesetzt werden.
+        if (entry.creator_id !== currentUser.id) {
+            showErrorNotification("Löschen fehlgeschlagen: Sie können nur Ihre eigenen Einträge löschen.");
+            loadingIndicator.style.display = 'none'; // Ladeanzeige ausblenden
+            return; // Frühzeitiger Ausstieg, da keine Berechtigung
+        }
+
+        // 2. Wenn der User der Ersteller ist, dann löschen
+        const { error: deleteError } = await supabaseClient
             .from('house_entries')
             .delete()
-            .eq('id', entryId)
-            .eq('user_id', currentUser.id); // Stellt sicher, dass nur der Ersteller löscht
+            .eq('id', entryId);
+            // Die Klausel .eq('creator_id', currentUser.id) ist hier nicht mehr zwingend,
+            // da wir dies bereits clientseitig geprüft haben und die RLS-Policy serverseitig greifen sollte.
 
-        if (error) throw error;
+        if (deleteError) {
+            console.error("Supabase Fehler beim Löschen:", deleteError);
+            throw deleteError; // Wird vom catch-Block behandelt
+        }
 
         console.log(`Eintrag ${entryId} gelöscht.`);
         await loadHouseEntries(currentSelectedStreetId);
         sortAndDisplayHouseEntries(); // Statt displayHouseEntries direkt aufzurufen
 
+        // NEU: Fortschritt der Straße neu berechnen und speichern // ENTFERNT
+        // if (currentSelectedStreetId && currentSelectedStreetName && currentSelectedPostalCode) { // ENTFERNT
+        //     await calculateAndUpdateStreetProgress(currentSelectedStreetId, currentSelectedStreetName, currentSelectedPostalCode); // ENTFERNT
+        // } // ENTFERNT
+
     } catch (error) {
-        console.error("Fehler beim Löschen:", error);
-        showError(`Fehler beim Löschen: ${error.message}`);
+        console.error("Fehler im Löschprozess für Eintrag:", entryId, error);
+        // Der spezielle Fall "nicht der Ersteller" wird oben direkt mit return und eigener Meldung behandelt.
+        // Alle anderen Fehler (fetch, !entry, deleteError, calculateAndUpdateStreetProgress) landen hier.
+        showErrorNotification(`Fehler beim Löschen: ${error.message}`);
     } finally {
         loadingIndicator.style.display = 'none';
     }
@@ -1447,7 +1627,7 @@ function clearHouseEntryForm() {
 }
 
 
-function backToStreetList() {
+async function backToStreetList() {
     // Echten Detail-Inhalt und Skeleton ausblenden
     if (streetDetailContainer) {
         streetDetailContainer.style.display = 'none';
@@ -1457,20 +1637,18 @@ function backToStreetList() {
     
     removeFromLocalStorage(LS_ACTIVE_STREET_DETAIL_KEY); 
 
-    // "Zuletzt geöffnet"-Element entfernen, falls vorhanden
     if (lastOpenedStreetElementContainer && lastOpenedStreetElementContainer.parentNode) {
         lastOpenedStreetElementContainer.parentNode.removeChild(lastOpenedStreetElementContainer);
         lastOpenedStreetElementContainer = null;
     }
 
-    // Alphabet-Filter Zustand zurücksetzen und ausblenden
     isAlphabetFilterExpanded = false; 
     if (alphabetFilterContainer) {
         alphabetFilterContainer.classList.remove('expanded');
         alphabetFilterContainer.style.display = 'none'; 
-        alphabetFilterContainer.innerHTML = ''; // Sicherstellen, dass er leer ist für den nächsten Aufbau
+        alphabetFilterContainer.innerHTML = '';
     }
-    currentAlphabetFilter = null; // Wird in renderAlphabetFilter ggf. auf 'Alle' gesetzt
+    currentAlphabetFilter = null;
 
     const cachedStreetData = getFromLocalStorage(LS_STREET_CACHE_KEY);
     const currentPlz = plzInput.value.trim();
@@ -1479,9 +1657,11 @@ function backToStreetList() {
         console.log("Restoring street list from cache for PLZ:", currentPlz);
         if (streetListPlaceholder) streetListPlaceholder.style.display = 'none';
         if (streetListContainer) streetListContainer.innerHTML = ''; 
+        // ENTFERNT: await fetchAllStreetProgressDataFromDB(); 
+        // displayStreets verwendet jetzt die globale streetProgressData Map.
         displayStreets(cachedStreetData.streets, currentPlz); 
-        if(alphabetFilterContainer && cachedStreetData.streets.length > 0) {
-            alphabetFilterContainer.style.display = 'flex'; // Sicherstellen, dass Filter sichtbar ist
+        if(alphabetFilterContainer && cachedStreetData.streets.length > 0) { 
+            alphabetFilterContainer.style.display = 'flex';
         }
     } else {
         if (streetListContainer) streetListContainer.innerHTML = ''; 
@@ -1493,24 +1673,25 @@ function backToStreetList() {
     }
     
     if (streetListContainer) streetListContainer.style.display = 'flex';
-    if (currentViewTitleElement) currentViewTitleElement.textContent = 'SellX Solutions'; // Standardtitel wiederherstellen
-    if (headerControls) headerControls.style.display = 'flex'; // Header-Controls für Straßenliste anzeigen
+    if (currentViewTitleElement) currentViewTitleElement.textContent = 'SellX Solutions';
+    if (headerControls) headerControls.style.display = 'flex';
 
     currentSelectedStreetId = null;
+    currentSelectedStreetName = null; // NEU
+    currentSelectedPostalCode = null; // NEU
     currentHouseEntries = [];
     currentEditingEntryId = null;
     clearError();
-    // plzInput.focus(); // Fokus nicht automatisch setzen
 }
 
 // --- NEU: View Switching Logik ---
 window.switchView = function(viewIdToShow, viewTitle) {
-    console.log(`[switchView] Start: Wechsle zu ${viewIdToShow} (${viewTitle})`);
+    //console.log(`[switchView] Start: Wechsle zu ${viewIdToShow} (${viewTitle})`);
 
     // 1. Alle Views ausblenden (explizit über style.display)
     views.forEach(view => {
         if (view.style.display !== 'none' && view.id !== viewIdToShow) { // Nur loggen, wenn es tatsächlich ausgeblendet wird
-             console.log(`[switchView] Blende aus: ${view.id}`);
+            //console.log(`[switchView] Blende aus: ${view.id}`);
         }
         view.style.display = 'none'; // Explizit ausblenden
         view.classList.remove('active-view'); // Auch Klasse entfernen
@@ -1521,12 +1702,14 @@ window.switchView = function(viewIdToShow, viewTitle) {
     if (leaderboardViewSkeleton) leaderboardViewSkeleton.classList.add('hidden');
     if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden');
     if (calendarViewSkeleton) calendarViewSkeleton.classList.add('hidden');
+    if (adminViewSkeleton) adminViewSkeleton.classList.add('hidden'); // NEU
+    if (workTimeEvalViewSkeleton) workTimeEvalViewSkeleton.classList.add('hidden'); // NEU
 
 
     // 2. Die ausgewählte View anzeigen (explizit über style.display)
     const viewToShow = document.getElementById(viewIdToShow);
     if (viewToShow) {
-        console.log(`[switchView] Zeige an: ${viewToShow.id}`);
+        //console.log(`[switchView] Zeige an: ${viewToShow.id}`);
         // Wähle den korrekten Display-Typ basierend auf der View
         if (viewIdToShow === 'mainView') {
             viewToShow.style.display = 'flex'; // mainView ist ein Flex-Container
@@ -1535,7 +1718,7 @@ window.switchView = function(viewIdToShow, viewTitle) {
         }
         viewToShow.classList.add('active-view'); // Klasse hinzufügen
     } else {
-        console.error(`[switchView] FEHLER: View mit ID "${viewIdToShow}" nicht gefunden!`);
+        //console.error(`[switchView] FEHLER: View mit ID "${viewIdToShow}" nicht gefunden!`);
         return;
     }
 
@@ -1566,32 +1749,51 @@ window.switchView = function(viewIdToShow, viewTitle) {
     // 5. Optional: Daten für die neue Ansicht laden UND SKELETON ANZEIGEN
     switch (viewIdToShow) {
         case 'statsView':
-            console.log("[switchView] Lade Daten für Statistik");
+            //console.log("[switchView] Lade Daten für Statistik");
             if (statsViewSkeleton) statsViewSkeleton.classList.remove('hidden');
             if (statsContent) statsContent.style.display = 'none';
             loadStatsData();
             break;
         case 'leaderboardView':
-             console.log("[switchView] Lade Daten für Leaderboard");
+             //console.log("[switchView] Lade Daten für Leaderboard");
              if (leaderboardViewSkeleton) leaderboardViewSkeleton.classList.remove('hidden');
              if (leaderboardContent) leaderboardContent.style.display = 'none';
              loadLeaderboardData();
             break;
         case 'settingsView':
-             console.log("[switchView] Lade Daten für Einstellungen");
+             //console.log("[switchView] Lade Daten für Einstellungen");
              if (settingsViewSkeleton) settingsViewSkeleton.classList.remove('hidden');
              if (settingsContent) settingsContent.style.display = 'none';
              loadSettingsData();
             break;
         case 'calendarView': // NEUER CASE
-            console.log("[switchView] Lade Daten für Kalender");
+            //console.log("[switchView] Lade Daten für Kalender");
             if (calendarViewSkeleton) calendarViewSkeleton.classList.remove('hidden');
-            if (timeTrackingControls) timeTrackingControls.style.display = 'none';
-            if (timeTrackingHistory) timeTrackingHistory.style.display = 'none';
+            
+            // Elemente direkt referenzieren und ausblenden, BEVOR loadCalendarData aufgerufen wird
+            const ttControls = document.getElementById('timeTrackingControls');
+            const ttHistory = document.getElementById('timeTrackingHistory');
+            if (ttControls) ttControls.style.display = 'none';
+            if (ttHistory) ttHistory.style.display = 'none';
+            
             loadCalendarData();
             break;
+        case 'adminView': // NEUER CASE
+            console.log("[switchView] Lade Daten für Admin-Bereich");
+            if (adminViewSkeleton) adminViewSkeleton.classList.remove('hidden');
+            if (adminContent) adminContent.style.display = 'none';
+            loadAdminData();
+            break;
+        case 'workTimeEvaluationView': // NEUER CASE
+            console.log("[switchView] Lade Daten für Arbeitszeitauswertung");
+            if (workTimeEvalViewSkeleton) workTimeEvalViewSkeleton.classList.remove('hidden');
+            if (userEvalList) userEvalList.innerHTML = '<div class="skeleton-list-item" style="margin-bottom: 8px;"></div><div class="skeleton-list-item" style="margin-bottom: 8px;"></div><div class="skeleton-list-item" style="margin-bottom: 8px;"></div>'; // Skeleton anzeigen
+            if (userDetailEvalContainer) userDetailEvalContainer.style.display = 'none'; // Detailansicht initial ausblenden
+            if (userListForEvalContainer) userListForEvalContainer.style.display = 'block'; // Sicherstellen, dass Mitarbeiterliste angezeigt wird
+            loadWorkTimeEvaluationData();
+            break;
         case 'mainView':
-             console.log("[switchView] Aktiviere Hauptansicht");
+             //console.log("[switchView] Aktiviere Hauptansicht");
              updateGreetingPlaceholder(); // NEU: Platzhalter-Begrüßung aktualisieren
              if (streetDetailContainer.style.display !== 'none') { backToStreetList(); }
             break;
@@ -1599,7 +1801,7 @@ window.switchView = function(viewIdToShow, viewTitle) {
 
      // Scrollt die neue Ansicht nach oben (unverändert)
      viewContainer.scrollTop = 0;
-     console.log(`[switchView] Ende: ${viewIdToShow} ist jetzt aktiv.`);
+     //console.log(`[switchView] Ende: ${viewIdToShow} ist jetzt aktiv.`);
 }
 
 // --- Utility Funktionen ---
@@ -1617,7 +1819,7 @@ function clearError() {
 
 // --- NEU: Event Listener für Input Fokus ---
 function setupInputFocusListeners() {
-    console.log("[setupInputFocusListeners] Adding listeners for nav hiding and Enter key.");
+    //console.log("[setupInputFocusListeners] Adding listeners for nav hiding and Enter key.");
 
     // === WIEDERHERGESTELLT: Listener für Nav-Ausblenden ===
     const inputFieldsForNav = document.querySelectorAll(
@@ -1640,14 +1842,14 @@ function setupInputFocusListeners() {
 
 // === NEU: Handler für Focus/Blur ausgelagert ===
 function handleInputFocus() {
-    console.log('Input focus, hiding nav');
+    //console.log('Input focus, hiding nav');
     document.body.classList.add('nav-hidden');
 }
 
 function handleInputBlur() {
     // Kleine Verzögerung, um Klicks auf die Nav zu ermöglichen
     setTimeout(() => {
-         console.log('Input blur, showing nav');
+         //console.log('Input blur, showing nav');
          document.body.classList.remove('nav-hidden');
     }, 150); // Leicht erhöhte Verzögerung
 }
@@ -1655,16 +1857,16 @@ function handleInputBlur() {
 
 // Fügt Enter-Key Listener für Elemente *innerhalb* der App hinzu
 function setupAppEnterKeyListeners() {
-     console.log("[setupAppEnterKeyListeners] Adding Enter key listeners.");
+     //console.log("[setupAppEnterKeyListeners] Adding Enter key listeners.");
      // -- PLZ Suche --
      if (plzInput && !plzInput.hasEnterListener) {
-         console.log(" -> Adding PLZ Enter listener.");
+          //console.log(" -> Adding PLZ Enter listener.");
          plzInput.addEventListener('keydown', handlePlzEnter);
          plzInput.hasEnterListener = true;
      }
      // -- Einstellungen (Anzeigename) --
       if (displayNameInput && !displayNameInput.hasEnterListener) {
-          console.log(" -> Adding Settings Enter listener.");
+          //console.log(" -> Adding Settings Enter listener.");
          displayNameInput.addEventListener('keydown', handleSettingsEnter);
          displayNameInput.hasEnterListener = true;
       }
@@ -1673,7 +1875,7 @@ function setupAppEnterKeyListeners() {
 // Handler-Funktionen für Enter (unverändert)
 function handlePlzEnter(event) {
     if (event.key === 'Enter') {
-        console.log("Enter detected in PLZ Input"); // DEBUG
+        //console.log("Enter detected in PLZ Input"); // DEBUG
         event.preventDefault();
         searchStreets(); // Straßen suchen
     }
@@ -1681,7 +1883,7 @@ function handlePlzEnter(event) {
 
 function handleSettingsEnter(event) {
      if (event.key === 'Enter') {
-         console.log("Enter detected in Display Name Input"); // DEBUG
+         //console.log("Enter detected in Display Name Input"); // DEBUG
          event.preventDefault();
          saveSettings(); // Einstellungen speichern
      }
@@ -1692,7 +1894,7 @@ function handleSettingsEnter(event) {
 // Rendert die Alphabet-Buttons und den Toggle
 function renderAlphabetFilter() {
     if (!alphabetFilterContainer) {
-        console.error("alphabetFilterContainer ist nicht initialisiert!");
+        showErrorNotification("alphabetFilterContainer ist nicht initialisiert!");
         return;
     }
     alphabetFilterContainer.innerHTML = ''; // Immer leeren vor Neubau
@@ -1702,7 +1904,7 @@ function renderAlphabetFilter() {
     alphabetFilterContainer.style.borderRadius = '8px'; // Abgerundete Ecken
     alphabetFilterContainer.style.marginBottom = '10px'; // Abstand nach unten
 
-    // Toggle-Button (früher "Alle"-Button)
+    // Toggle-Button (Haupt-Umschalter)
     const toggleButton = document.createElement('button');
     toggleButton.id = 'alphabetToggleAllButton';
     toggleButton.className = 'alphabet-button'; // Nutzt vorhandene Basis-Stile
@@ -1714,19 +1916,29 @@ function renderAlphabetFilter() {
         isAlphabetFilterExpanded = !isAlphabetFilterExpanded;
         alphabetFilterContainer.classList.toggle('expanded', isAlphabetFilterExpanded);
         updateToggleArrowIcon();
-
-        // Wenn der Filter geschlossen wird und nicht "Alle" aktiv war,
-        // oder wenn er einfach geschlossen wird, soll "Alle" aktiv werden.
-        if (!isAlphabetFilterExpanded) {
-            filterStreetsByLetter('Alle');
-        }
+        updateAlphabetFilterActiveState(); // Stellt sicher, dass Label und aktive Klassen korrekt sind
     };
     alphabetFilterContainer.appendChild(toggleButton);
 
-    // Wrapper für die Buchstaben A-Z
+    // Wrapper für die Buchstaben A-Z und den neuen "Alle"-Button
     const lettersWrapper = document.createElement('div');
     lettersWrapper.id = 'alphabetLettersWrapper';
     alphabetFilterContainer.appendChild(lettersWrapper);
+
+    // NEU: "Alle"-Button im Wrapper erstellen und hinzufügen
+    const allButtonInWrapper = document.createElement('button');
+    allButtonInWrapper.textContent = 'Alle';
+    allButtonInWrapper.className = 'alphabet-button'; // Gleiches Styling wie Buchstaben
+    allButtonInWrapper.dataset.letter = 'Alle'; // Wichtig für updateAlphabetFilterActiveState
+    allButtonInWrapper.type = 'button';
+    allButtonInWrapper.onclick = () => {
+        filterStreetsByLetter('Alle');
+        isAlphabetFilterExpanded = false; // Filter zuklappen nach Auswahl
+        alphabetFilterContainer.classList.remove('expanded');
+        updateToggleArrowIcon();
+        // updateAlphabetFilterActiveState() wird bereits von filterStreetsByLetter aufgerufen
+    };
+    lettersWrapper.appendChild(allButtonInWrapper); // "Alle" zuerst einfügen
 
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
     alphabet.forEach(letter => {
@@ -1777,7 +1989,7 @@ function filterStreetsByLetter(letter) {
             show = streetName.toLowerCase().startsWith(letter.toLowerCase());
         }
 
-        item.style.display = show ? 'block' : 'none';
+        item.style.display = show ? 'flex' : 'none'; // KORREKTUR: 'flex' statt 'block'
         if (show) hasVisibleItems = true;
     });
     
@@ -1809,23 +2021,19 @@ function updateAlphabetFilterActiveState() {
     const toggleLabel = document.getElementById('alphabetToggleLabel'); // Label im Toggle-Button
     
     if (toggleButton && toggleLabel) {
-        if (currentAlphabetFilter === 'Alle') {
-            toggleButton.classList.add('active');
-            toggleLabel.textContent = 'Alle';
+        // Setzt das Label des Haupt-Toggle-Buttons
+        if (currentAlphabetFilter && currentAlphabetFilter !== 'Alle') {
+            toggleLabel.textContent = currentAlphabetFilter;
+            toggleButton.classList.remove('active'); // Haupt-Toggle ist nicht "Alle"
         } else {
-            toggleButton.classList.remove('active');
-            // Zeige den aktiven Buchstaben im Toggle-Button-Label, wenn der Filter zugeklappt ist
-            if (!isAlphabetFilterExpanded && currentAlphabetFilter) {
-                 toggleLabel.textContent = currentAlphabetFilter;
-            } else {
-                 toggleLabel.textContent = 'Alle'; // Oder 'Filter'
-            }
+            toggleLabel.textContent = 'Alle';
+            toggleButton.classList.add('active'); // Haupt-Toggle ist "Alle"
         }
     }
 
     const lettersWrapper = document.getElementById('alphabetLettersWrapper');
     if (lettersWrapper) {
-        const letterButtons = lettersWrapper.querySelectorAll('.alphabet-button');
+        const letterButtons = lettersWrapper.querySelectorAll('.alphabet-button'); // Inklusive des neuen "Alle"-Buttons
         letterButtons.forEach(btn => {
             if (btn.dataset.letter === currentAlphabetFilter) {
                 btn.classList.add('active');
@@ -1867,6 +2075,10 @@ async function loadStatsData() {
     // Skeleton wird von switchView angezeigt. Inhalt wird von switchView ausgeblendet.
     if (statsErrorDisplay) statsErrorDisplay.style.display = 'none';
     // if (statsLoadingIndicator) statsLoadingIndicator.style.display = 'flex'; // ENTFERNT: Spinner nicht mehr anzeigen
+    const adminButtonContainer = document.getElementById('adminButtonContainerStats');
+    if (adminButtonContainer) {
+        adminButtonContainer.style.display = 'none'; // Initial ausblenden
+    }
 
     try {
         // Hole alle Einträge, die vom aktuellen Benutzer ERSTELLT wurden
@@ -1908,6 +2120,13 @@ async function loadStatsData() {
 
         if (statsContent) statsContent.style.display = 'block'; // Inhalt anzeigen
         if (statsViewSkeleton) statsViewSkeleton.classList.add('hidden'); // Skeleton ausblenden
+        if (adminButtonContainer && ADMIN_USER_IDS.includes(currentUser.id)) {
+            adminButtonContainer.style.display = 'block'; // Oder 'flex', je nach Styling des Containers
+            console.log("Admin-Benutzer in StatsView erkannt, Admin-Button wird angezeigt.");
+        } else if (adminButtonContainer) {
+            adminButtonContainer.style.display = 'none';
+             console.log("Kein Admin-Benutzer in StatsView, Admin-Button bleibt verborgen.");
+        }
 
     } catch (error) {
         console.error("Fehler beim Laden der Statistiken:", error);
@@ -1962,6 +2181,7 @@ async function loadLeaderboardData() {
     }
 }
 
+
 async function loadSettingsData() {
     if (!currentUser) return;
 
@@ -1969,6 +2189,8 @@ async function loadSettingsData() {
     if (settingsErrorDisplay) settingsErrorDisplay.style.display = 'none';
     if (settingsStatus) settingsStatus.textContent = '';
     if (settingsStatus) settingsStatus.className = '';
+    // {{ Entferne diese Zeile, falls noch vorhanden (sollte schon weg sein durch vorherigen Schritt): }}
+    // if (adminSettingsButton) adminSettingsButton.style.display = 'none'; 
 
     try {
         const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
@@ -1977,6 +2199,15 @@ async function loadSettingsData() {
 
         const currentDisplayName = user.user_metadata?.display_name || '';
         if (displayNameInput) displayNameInput.value = currentDisplayName;
+
+        // --- E-Mail-Adresse anzeigen ---
+        // Das userEmailDisplay Element ist jetzt das innere <span> für die E-Mail
+        const userEmailDisplayElement = document.getElementById('userEmailDisplay');
+        if (userEmailDisplayElement && user && user.email) {
+            userEmailDisplayElement.textContent = user.email;
+        }
+        // --- ENDE E-Mail-Adresse anzeigen ---
+
 
         // --- Farbschema-Auswahl initialisieren ---
         // Das HTML-Element wird jetzt direkt aus index.html erwartet
@@ -1993,13 +2224,14 @@ async function loadSettingsData() {
                 colorSchemeSelect.setAttribute('data-listener-added', 'true');
             }
         } else {
-            console.warn("Farbschema Select-Element (colorSchemeSelect) nicht im DOM gefunden.");
+            // console.warn("Farbschema Select-Element (colorSchemeSelect) nicht im DOM gefunden.");
+            showErrorNotification("Farbschema Select-Element (colorSchemeSelect) nicht im DOM gefunden.");
         }
         // --- ENDE Farbschema-Auswahl ---
 
 
-        if (settingsContent) settingsContent.style.display = 'block';
-        if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden');
+            if (settingsContent) settingsContent.style.display = 'block';
+            if (settingsViewSkeleton) settingsViewSkeleton.classList.add('hidden');
 
     } catch (error) {
         console.error("Fehler beim Laden der Einstellungen:", error);
@@ -2076,7 +2308,8 @@ function renderStatusChart(statusCounts) {
             const color = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
             return color || fallbackColor;
         } catch (e) {
-            console.warn(`Konnte CSS-Variable ${cssVar} nicht lesen, verwende Fallback ${fallbackColor}`, e);
+            // console.warn(`Konnte CSS-Variable ${cssVar} nicht lesen, verwende Fallback ${fallbackColor}`, e);
+            showErrorNotification(`Konnte CSS-Variable ${cssVar} nicht lesen, verwende Fallback ${fallbackColor}: ` + (e.message || e.toString()));
             return fallbackColor;
         }
     };
@@ -2320,9 +2553,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
-        console.log("ChartDataLabels Plugin registriert.");
+        //console.log("ChartDataLabels Plugin registriert.");
     } else {
-        console.warn('Chart oder ChartDataLabels Plugin nicht gefunden. Stelle sicher, dass es korrekt eingebunden ist.');
+        // console.warn('Chart oder ChartDataLabels Plugin nicht gefunden. Stelle sicher, dass es korrekt eingebunden ist.');
+        showErrorNotification('Chart oder ChartDataLabels Plugin nicht gefunden. Stelle sicher, dass es korrekt eingebunden ist.');
     }
 
     checkSession(); // Startet die Session-Prüfung
@@ -2363,13 +2597,11 @@ async function loadCalendarData() {
     console.log("[loadCalendarData] Initializing Calendar View for Time Tracking.");
 
     // DOM Elemente initialisieren (einmalig oder bei Bedarf neu)
-    initializeCalendarViewDOMElements();
+    initializeCalendarViewDOMElements(); // Globale Variablen timeTrackingControls etc. werden hier gesetzt
 
-    // Skeleton wird von switchView angezeigt. Inhalt (timeTrackingControls, timeTrackingHistory) wird von switchView ausgeblendet.
+    // Skeleton wird von switchView angezeigt. 
+    // Inhalt (timeTrackingControls, timeTrackingHistory) wird von switchView initial ausgeblendet.
     if (calendarErrorDisplay) calendarErrorDisplay.style.display = 'none';
-    // if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'flex'; // ENTFERNT
-    // currentStatusText wird durch Skeleton-Feedback ersetzt oder später gesetzt
-    // if (currentStatusText) currentStatusText.textContent = "Lädt...";
 
 
     try {
@@ -2382,10 +2614,11 @@ async function loadCalendarData() {
             historyDateInput.addEventListener('change', handleHistoryDateChange);
         }
         
-        await checkActiveWorkEntry(); // Prüfen, ob ein Eintrag aktiv ist
-        await loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date()));
+        await checkActiveWorkEntry(); // Prüfen, ob ein Eintrag aktiv ist und UI/Timer aktualisiert
+        await loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); // Historie für ausgewähltes Datum laden
+        await updateTodaySummary(); // NEU: Sicherstellen, dass die "Heute"-Zusammenfassung aktuell ist
 
-        // Inhalt anzeigen
+        // Inhalt anzeigen, NACHDEM Daten geladen wurden
         if (timeTrackingControls) timeTrackingControls.style.display = 'block'; // Oder 'flex', falls es ein Flex-Container ist
         if (timeTrackingHistory) timeTrackingHistory.style.display = 'block';
         if (calendarViewSkeleton) calendarViewSkeleton.classList.add('hidden'); // Skeleton ausblenden
@@ -2397,11 +2630,11 @@ async function loadCalendarData() {
             calendarErrorDisplay.style.display = 'block';
         }
         if (calendarViewSkeleton) calendarViewSkeleton.classList.add('hidden'); // Skeleton bei Fehler ausblenden
-        // Sicherstellen, dass Inhalt ausgeblendet bleibt
+        // Sicherstellen, dass Inhalt ausgeblendet bleibt (wurde schon von switchView gemacht)
         if (timeTrackingControls) timeTrackingControls.style.display = 'none';
         if (timeTrackingHistory) timeTrackingHistory.style.display = 'none';
     } finally {
-        // if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'none'; // ENTFERNT
+        // Nichts mehr hier bzgl. globalem Ladeindikator
     }
 }
 
@@ -2467,6 +2700,8 @@ async function checkActiveWorkEntry() {
         console.error("Error checking active work entry:", error);
         showCalendarError("Fehler beim Prüfen des aktiven Eintrags.");
         updateWorkUIInactive(); // Fallback
+    } finally {
+        await updateTodaySummary(); // NEU: "Heute"-Zusammenfassung immer aktualisieren
     }
 }
 
@@ -2478,7 +2713,7 @@ window.startWorkTimeTracking = async function() {
     if (currentStatusText) currentStatusText.textContent = "Starte...";
 
     const newStartTime = new Date();
-    let notesContent = null; // Initialisiere notesContent
+    let startLocationContent = null; // NEU: Variable für Start-Standort
 
     // Versuche, die Geolokation abzurufen
     try {
@@ -2488,20 +2723,21 @@ window.startWorkTimeTracking = async function() {
                 return;
             }
             navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true, // Fordere höhere Genauigkeit an
-                timeout: 10000,         // 10 Sekunden Timeout
-                maximumAge: 60000         // Akzeptiere gecachte Position bis zu 1 Minute alt
+                enableHighAccuracy: true, 
+                timeout: 10000,         
+                maximumAge: 60000         
             });
         });
 
         const { latitude, longitude } = position.coords;
-        notesContent = `https://www.google.com/maps?q=${latitude},${longitude}`;
-        console.log("Standort für Notiz erfasst:", notesContent);
+        startLocationContent = `https://www.google.com/maps?q=${latitude},${longitude}`; // NEU
+        console.log("Start-Standort erfasst:", startLocationContent);
 
     } catch (geoError) {
-        console.warn("Fehler beim Abrufen der Geolokation für Notiz:", geoError.message);
+        // console.warn("Fehler beim Abrufen des Start-Standorts:", geoError.message);
+        showErrorNotification("Fehler beim Abrufen des Start-Standorts: " + geoError.message);
         // Fahre fort, auch wenn der Standort nicht ermittelt werden konnte.
-        // notesContent bleibt null oder leer.
+        // startLocationContent bleibt null.
     }
 
 
@@ -2511,7 +2747,7 @@ window.startWorkTimeTracking = async function() {
             .insert({
                 user_id: currentUser.id,
                 start_time: newStartTime.toISOString(),
-                notes: notesContent // Füge den Standort-Link (oder null) hier ein
+                start_location: startLocationContent // NEU: start_location statt notes
             })
             .select('id, start_time')
             .single();
@@ -2519,13 +2755,14 @@ window.startWorkTimeTracking = async function() {
         if (error) throw error;
 
         activeWorkEntryId = data.id;
-        workStartTime = new Date(data.start_time); // Verwende die vom Server bestätigte Startzeit
+        workStartTime = new Date(data.start_time); 
         updateWorkUIActive();
-        loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); // Historie aktualisieren
+        await loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); 
+        await updateTodaySummary(); 
     } catch (error) {
         console.error("Error starting work:", error);
         showCalendarError("Fehler beim Starten der Arbeitszeit.");
-        updateWorkUIInactive(); // Zurücksetzen
+        updateWorkUIInactive(); 
         if (startWorkButton) startWorkButton.disabled = false;
     }
 };
@@ -2543,12 +2780,38 @@ window.stopWorkTimeTracking = async function() {
         durationMinutes = Math.round((newEndTime - workStartTime) / (1000 * 60));
     }
 
+    let endLocationContent = null; // NEU: Variable für End-Standort
+
+    // Versuche, die Geolokation für den End-Standort abzurufen
+    try {
+        const position = await new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject(new Error("Geolocation wird nicht unterstützt."));
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000
+            });
+        });
+        const { latitude, longitude } = position.coords;
+        endLocationContent = `https://www.google.com/maps?q=${latitude},${longitude}`; // NEU
+        console.log("End-Standort erfasst:", endLocationContent);
+    } catch (geoError) {
+        // console.warn("Fehler beim Abrufen des End-Standorts:", geoError.message);
+        showErrorNotification("Fehler beim Abrufen des End-Standorts: " + geoError.message);
+        // Fahre fort, auch wenn der Standort nicht ermittelt werden konnte.
+        // endLocationContent bleibt null.
+    }
+
     try {
         const { error } = await supabaseClient
             .from('work_time_entries')
             .update({
                 end_time: newEndTime.toISOString(),
-                duration_minutes: durationMinutes
+                duration_minutes: durationMinutes,
+                end_location: endLocationContent // NEU: end_location hinzufügen
             })
             .eq('id', activeWorkEntryId);
 
@@ -2557,12 +2820,13 @@ window.stopWorkTimeTracking = async function() {
         activeWorkEntryId = null;
         workStartTime = null;
         updateWorkUIInactive();
-        if (currentWorkDuration) currentWorkDuration.textContent = "00:00:00"; // Timer zurücksetzen
-        loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); // Historie aktualisieren
+        if (currentWorkDuration) currentWorkDuration.textContent = "00:00:00"; 
+        await loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); 
+        await updateTodaySummary(); 
     } catch (error) {
         console.error("Error stopping work:", error);
         showCalendarError("Fehler beim Stoppen der Arbeitszeit.");
-        updateWorkUIActive(); // Bleibe im aktiven Zustand, wenn Fehler
+        updateWorkUIActive(); 
         if (stopWorkButton) stopWorkButton.disabled = false;
     }
 };
@@ -2616,7 +2880,8 @@ function stopDurationTimer() {
 
 async function loadDailySummaryAndEntries(dateString) {
     if (!currentUser || !timeEntriesList || !noHistoryEntriesMessage) {
-        console.warn("loadDailySummaryAndEntries: Required DOM elements or user not found.");
+        // console.warn("loadDailySummaryAndEntries: Required DOM elements or user not found.");
+        showErrorNotification("loadDailySummaryAndEntries: Required DOM elements or user not found.");
         return;
     }
     
@@ -2626,9 +2891,11 @@ async function loadDailySummaryAndEntries(dateString) {
     noHistoryEntriesMessage.style.display = 'none';
     if (summaryDateDisplay) summaryDateDisplay.textContent = formatDateForDisplay(dateString);
     if (summaryTotalWork) summaryTotalWork.textContent = '--:--';
-    // if (summaryTotalBreak) summaryTotalBreak.textContent = '--:--'; // Entfernt
-    if (todayTotalWork) todayTotalWork.textContent = '00:00'; // Reset daily totals for today as well
-    // if (todayTotalBreak) todayTotalBreak.textContent = '00:00'; // Entfernt
+    
+    const todayDateStringForComparison = getLocalDateString(new Date());
+    if (dateString === todayDateStringForComparison) {
+        if (todayTotalWork) todayTotalWork.textContent = '00:00'; 
+    }
 
 
     try {
@@ -2637,10 +2904,10 @@ async function loadDailySummaryAndEntries(dateString) {
 
         const { data: entries, error } = await supabaseClient
             .from('work_time_entries')
-            .select('id, start_time, end_time, duration_minutes, notes')
+            .select('id, start_time, end_time, duration_minutes, start_location, end_location') // NEU: start_location, end_location statt notes
             .eq('user_id', currentUser.id)
             .gte('start_time', startDate.toISOString())
-            .lte('start_time', endDate.toISOString()) // Einträge, die an diesem Tag gestartet wurden
+            .lte('start_time', endDate.toISOString()) 
             .order('start_time', { ascending: true });
 
         if (error) throw error;
@@ -2649,7 +2916,6 @@ async function loadDailySummaryAndEntries(dateString) {
             noHistoryEntriesMessage.style.display = 'block';
         } else {
             let totalWorkMinutesForDay = 0;
-            // let totalBreakMinutesForDay = 0; // Entfernt
 
             entries.forEach((entry, index) => {
                 const li = document.createElement('li');
@@ -2659,50 +2925,56 @@ async function loadDailySummaryAndEntries(dateString) {
                 const endTimeFormatted = entry.end_time ? formatTime(new Date(entry.end_time)) : 'Laufend';
                 const durationFormatted = entry.duration_minutes ? formatMinutesToHM(entry.duration_minutes) : '-';
 
-                let notesDisplay = escapeHtml(entry.notes || '');
-                if (entry.notes && (entry.notes.startsWith('http://') || entry.notes.startsWith('https://'))) {
-                    notesDisplay = `<a href="${escapeHtml(entry.notes)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.notes)}</a>`;
+                let startLocationDisplay = '';
+                if (entry.start_location) {
+                    const escapedLoc = escapeHtml(entry.start_location);
+                    if (escapedLoc.startsWith('http')) {
+                        startLocationDisplay = `<div class="time-entry-location">Start-Ort: <a href="${escapedLoc}" target="_blank" rel="noopener noreferrer" class="location-link">Karte anzeigen</a></div>`;
+                    } else {
+                        startLocationDisplay = `<div class="time-entry-location">Start-Ort: ${escapedLoc}</div>`;
+                    }
                 }
 
+                let endLocationDisplay = '';
+                if (entry.end_location) {
+                    const escapedLoc = escapeHtml(entry.end_location);
+                    if (escapedLoc.startsWith('http')) {
+                        endLocationDisplay = `<div class="time-entry-location">End-Ort: <a href="${escapedLoc}" target="_blank" rel="noopener noreferrer" class="location-link">Karte anzeigen</a></div>`;
+                    } else {
+                        endLocationDisplay = `<div class="time-entry-location">End-Ort: ${escapedLoc}</div>`;
+                    }
+                }
+
+
                 li.innerHTML = `
-                    <div class="time-entry-details">
-                        <strong>${startTimeFormatted} - ${endTimeFormatted}</strong>
+                    <div class="time-entry-main">
+                        <div class="time-entry-details">
+                            <strong>${startTimeFormatted} - ${endTimeFormatted}</strong>
+                        </div>
+                        <div class="time-entry-duration">Dauer: ${durationFormatted}</div>
                     </div>
-                    <div class="time-entry-duration">Dauer: ${durationFormatted}</div>
+                    ${startLocationDisplay}
+                    ${endLocationDisplay}
                 `;
                 timeEntriesList.appendChild(li);
 
                 if (entry.duration_minutes) {
                     totalWorkMinutesForDay += entry.duration_minutes;
                 }
-
-                // Pausenberechnung zum nächsten Eintrag // KOMPLETTER BLOCK ENTFERNT
-                // if (entry.end_time && index < entries.length - 1) {
-                //     const nextEntry = entries[index + 1];
-                //     const breakStart = new Date(entry.end_time);
-                //     const breakEnd = new Date(nextEntry.start_time);
-                //     if (breakEnd > breakStart) {
-                //         const breakDurationMs = breakEnd - breakStart;
-                //         totalBreakMinutesForDay += Math.round(breakDurationMs / (1000 * 60));
-                //     }
-                // }
             });
 
             if (summaryTotalWork) summaryTotalWork.textContent = formatMinutesToHM(totalWorkMinutesForDay);
-            // if (summaryTotalBreak) summaryTotalBreak.textContent = formatMinutesToHM(totalBreakMinutesForDay); // Entfernt
-
-            // Wenn das angezeigte Datum heute ist, aktualisiere auch die "Heute" Anzeige
+            
             const todayDateString = getLocalDateString(new Date());
             if (dateString === todayDateString) {
                 if (todayTotalWork) todayTotalWork.textContent = formatMinutesToHM(totalWorkMinutesForDay);
-                // if (todayTotalBreak) todayTotalBreak.textContent = formatMinutesToHM(totalBreakMinutesForDay); // Entfernt
             }
         }
 
     } catch (err) {
         console.error("Error loading daily entries:", err);
         showCalendarError("Fehler beim Laden der Tageshistorie.");
-        noHistoryEntriesMessage.style.display = 'block'; // Zeige "keine Einträge" auch bei Fehler
+        noHistoryEntriesMessage.style.display = 'block'; 
     } finally {
         if (calendarLoadingIndicator) calendarLoadingIndicator.style.display = 'none';
     }
@@ -2750,30 +3022,1295 @@ function showCalendarError(message) {
 }
 
 
-// --- Aufräumen beim Verlassen der View ---
-// Dies ist ein Beispiel, wie man den Timer stoppen könnte.
-// switchView müsste angepasst werden, um eine "onLeave" Callback für Views zu unterstützen.
-// Für den Moment wird der Timer global gestoppt/gestartet, wenn die Buttons geklickt werden
-// oder die View geladen wird.
-
-// ... bestehender Code ...
-// Am Ende der Datei oder wo passend:
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-        // Optional: Hier könnte man den Timer anhalten oder eine Notiz speichern,
-        // falls die App im Hintergrund ist. Fürs Erste belassen wir es bei der
-        // kontinuierlichen Zeitmessung, solange die Seite offen ist.
         console.log("Seite ist jetzt im Hintergrund / nicht sichtbar.");
     } else if (document.visibilityState === 'visible') {
         console.log("Seite ist wieder sichtbar.");
         // Beim Sichtbarwerden den Status neu prüfen, falls die Kalender-View aktiv ist
         if (calendarView && calendarView.classList.contains('active-view')) {
-            checkActiveWorkEntry(); // UI und Timer ggf. neu starten
-            // Historie für das aktuell im Datepicker ausgewählte Datum neu laden.
-            if (historyDateInput && historyDateInput.value) {
-                 loadDailySummaryAndEntries(historyDateInput.value);
-            }
+            checkActiveWorkEntry().then(async () => { // Stellt sicher, dass checkActiveWorkEntry fertig ist
+                 // Historie für das aktuell im Datepicker ausgewählte Datum neu laden.
+                if (historyDateInput && historyDateInput.value) {
+                    await loadDailySummaryAndEntries(historyDateInput.value);
+                }
+                // Und die "Heute"-Ansicht explizit aktualisieren
+                await updateTodaySummary();
+            });
         }
     }
 });
 
+// --- NEU: Globale Funktion für Fehler-Popups ---
+function showErrorNotification(message) {
+    const container = document.getElementById('notificationContainer');
+    if (!container) {
+        // Fallback, falls der Container (noch) nicht da ist
+        console.error("Fehler-Popup: " + message); // Logge es trotzdem
+        return;
+    }
+
+    const toastId = 'toast-' + Date.now() + Math.random().toString(36).substr(2, 9); // Eindeutige ID
+    const toast = document.createElement('div');
+    toast.className = 'notification-toast';
+    toast.id = toastId;
+
+    const icon = document.createElement('span');
+    icon.className = 'material-icons';
+    icon.textContent = 'error_outline'; // Passendes Fehlericon
+    toast.appendChild(icon);
+
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = message;
+    toast.appendChild(messageSpan);
+
+    // Füge neue Benachrichtigungen oben im Container ein
+    if (container.firstChild) {
+        container.insertBefore(toast, container.firstChild);
+    } else {
+        container.appendChild(toast);
+    }
+
+    // Nach der CSS-Animation (5s) das DOM-Element entfernen
+    setTimeout(() => {
+        const currentToast = document.getElementById(toastId);
+        if (currentToast && currentToast.parentNode === container) {
+            container.removeChild(currentToast);
+        }
+    }, 5000); // Muss mit der Dauer der CSS-Animation übereinstimmen
+}
+// --- ENDE: Globale Funktion für Fehler-Popups ---
+
+// --- NEUE FUNKTIONEN für Straßenfortschritt ---
+async function fetchAllStreetProgressDataFromDB() {
+    streetProgressData.clear(); // Bestehende In-Memory-Daten löschen
+    console.log("Lade Straßenfortschrittsdaten aus der DB (fetchAllStreetProgressDataFromDB)...");
+
+    const { data: streetsFromDB, error: streetsError } = await supabaseClient
+        .from('streets')
+        .select('name, postal_code, percent_completed, id'); // ID wird für den Key und Join benötigt
+
+    if (streetsError) {
+        console.error("Error fetching streets table for progress:", streetsError);
+        showErrorNotification("Fehler beim Laden der Straßenfortschrittsdaten: " + (streetsError.message || streetsError.toString()));
+        return;
+    }
+
+    const { data: entries, error: entriesErrorData } = await supabaseClient
+        .from('house_entries')
+        .select('house_number, street_id'); // street_id für den Join
+
+    if (entriesErrorData) {
+        console.error("Error fetching house_entries for progress count:", entriesErrorData);
+        showErrorNotification("Fehler beim Zählen der Einträge für Fortschritt: " + (entriesErrorData.message || entriesErrorData.toString()));
+        return;
+    }
+
+    // Zuerst die `processedCount` pro `street_id` berechnen
+    const processedCountsByStreetId = new Map();
+    if (entries) {
+        entries.forEach(entry => {
+            if (entry.street_id && entry.house_number) {
+                if (!processedCountsByStreetId.has(entry.street_id)) {
+                    processedCountsByStreetId.set(entry.street_id, new Set());
+                }
+                // Hausnummer normalisieren für korrekte Zählung eindeutiger Nummern
+                processedCountsByStreetId.get(entry.street_id).add(String(entry.house_number).trim().toLowerCase());
+            }
+        });
+    }
+
+    // Dann `streetProgressData` (die globale Map) füllen
+    if (streetsFromDB) {
+        streetsFromDB.forEach(street => {
+            if (street.name && street.postal_code) {
+                const streetKey = `${street.postal_code}-${street.name}`;
+                const uniqueHouseNumbersForStreet = processedCountsByStreetId.get(street.id);
+                const currentProcessedCount = uniqueHouseNumbersForStreet ? uniqueHouseNumbersForStreet.size : 0;
+
+                streetProgressData.set(streetKey, {
+                    processedCount: currentProcessedCount,
+                    percentCompletedFromDB: street.percent_completed // Dieser Wert kann null sein
+                });
+            }
+        });
+    }
+    console.log("Globale streetProgressData Map initialisiert mit DB-Daten:", streetProgressData);
+    // Optional: Die gesamte streetProgressData Map jetzt in localStorage speichern für den nächsten Kaltstart.
+    // saveToLocalStorage('globalStreetProgressCache', Array.from(streetProgressData.entries()));
+}
+
+async function fetchTotalHouseNumbersFromOverpass(streetName, postalCode) {
+    const cacheKey = `${postalCode}-${streetName}`;
+    const cached = totalHouseNumbersCache.get(cacheKey);
+
+    if (cached && (Date.now() - cached.timestamp < TOTAL_HN_CACHE_DURATION)) {
+        console.log(`[Cache HIT] Gesamtzahl HN für ${streetName} (${postalCode}): ${cached.count}`);
+        return cached.count;
+    }
+    console.log(`[Cache MISS] Lade Gesamtzahl HN für ${streetName} (${postalCode}) von Overpass...`);
+
+    const overpassUrl = 'https://overpass-api.de/api/interpreter';
+    const query = `
+        [out:json][timeout:20];
+        area["postal_code"="${postalCode}"]->.searchArea;
+        (
+          node(area.searchArea)["addr:street"~"^${streetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$",i]["addr:housenumber"];
+          way(area.searchArea)["addr:street"~"^${streetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$",i]["addr:housenumber"];
+          relation(area.searchArea)["addr:street"~"^${streetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$",i]["addr:housenumber"];
+        );
+        out count;
+    `;
+
+    try {
+        const response = await fetch(overpassUrl, {
+            method: 'POST',
+            body: `data=${encodeURIComponent(query)}`
+        });
+        if (!response.ok) {
+             let errorText = `Overpass API Fehler: ${response.status} ${response.statusText}`;
+             if (response.status === 429 || response.status === 504) {
+                 errorText = "Overpass API ist überlastet. Versuche es später erneut.";
+             }
+             throw new Error(errorText);
+        }
+        const data = await response.json();
+        let totalCount = 0;
+        if (data.elements && data.elements.length > 0) {
+            const counts = data.elements[0].tags;
+            totalCount = (parseInt(counts.nodes) || 0) +
+                         (parseInt(counts.ways) || 0) +
+                         (parseInt(counts.relations) || 0);
+        }
+
+        console.log(`Overpass Ergebnis für ${streetName} (${postalCode}): ${totalCount} Hausnummern.`);
+        totalHouseNumbersCache.set(cacheKey, { count: totalCount, timestamp: Date.now() });
+        return totalCount;
+    } catch (error) {
+        console.error(`Fehler beim Abrufen der Gesamtzahl der Hausnummern für ${streetName} (${postalCode}):`, error);
+        return null; 
+    }
+}
+
+function updateStreetProgressUI(indicatorElement, { processedCount, totalCount, directPercentage }) {
+    if (!indicatorElement) return;
+
+    const isSvgCircle = indicatorElement.querySelector('.progress-ring__circle');
+    const isHorizontalBar = indicatorElement.classList.contains('horizontal-progress-container');
+
+    let percentage = 0;
+    // let displayProcessedCountOnly = false; // ENTFERNT
+
+    // Logik zur Bestimmung des Prozentwerts
+    if (directPercentage !== null && typeof directPercentage === 'number') {
+        percentage = Math.min(Math.max(directPercentage, 0), 100);
+    } else if (totalCount !== null && totalCount > 0 && typeof processedCount === 'number' && processedCount >= 0) {
+        // Dieser Fall wird seltener relevant sein, da wir uns primär auf directPercentage verlassen,
+        // aber er bleibt als Fallback, falls directPercentage null ist, aber Overpass-Daten vorliegen.
+        percentage = Math.min((processedCount / totalCount) * 100, 100);
+    } else { // directPercentage ist null (und kein Fallback auf totalCount möglich) oder andere Daten fehlen
+        percentage = 0; // Wird als 0% oder --% angezeigt
+    }
+
+
+    if (isSvgCircle) {
+        const circle = indicatorElement.querySelector('.progress-ring__circle');
+        const percentageSpan = indicatorElement.querySelector('.progress-percentage');
+        const backgroundCircle = indicatorElement.querySelector('.progress-ring__background');
+
+        if (!circle || !percentageSpan || !backgroundCircle) return;
+
+        const radius = circle.r.baseVal.value;
+        const circumference = 2 * Math.PI * radius;
+
+        circle.style.strokeDasharray = `${circumference} ${circumference}`;
+        backgroundCircle.style.strokeDasharray = `${circumference} ${circumference}`; // Hintergrund immer voll
+        backgroundCircle.style.strokeDashoffset = 0;
+
+        if (directPercentage === null) { // Wenn DB-Wert null ist, immer --% anzeigen (oder 0% falls percentage = 0)
+            percentageSpan.textContent = (processedCount > 0 && percentage === 0) ? '0%' : (percentage === 0 ? '--%' : `${Math.round(percentage)}%`);
+            if (percentage === 0 && processedCount === 0) percentageSpan.textContent = '--%'; // Explizit --% wenn keine Daten
+
+            circle.style.strokeDashoffset = circumference; // Leerer Kreis für --%
+            circle.style.stroke = 'var(--text-color-muted)';
+            percentageSpan.style.color = 'var(--text-color-muted)';
+            // Wenn es trotz null directPercentage einen berechneten Prozentwert > 0 gibt (durch Fallback auf totalCount)
+            // dann den Kreis entsprechend füllen.
+            if (percentage > 0) {
+                 const offset = circumference - (percentage / 100) * circumference;
+                 circle.style.strokeDashoffset = offset;
+                 // Farbverlauf für > 0 %
+                const greenComponent = Math.round(50 + (percentage * 1.5));
+                const redComponent = Math.round(150 - (percentage * 1.0));
+                const r = Math.max(0, Math.min(255, redComponent));
+                const g = Math.max(0, Math.min(255, greenComponent));
+                const b = 50;
+                circle.style.stroke = `rgb(${r}, ${g}, ${b})`;
+                percentageSpan.style.color = `rgb(${r}, ${g}, ${b})`;
+            }
+
+        } else { // directPercentage ist eine Zahl
+            percentageSpan.textContent = `${Math.round(percentage)}%`;
+            const offset = circumference - (percentage / 100) * circumference;
+            circle.style.strokeDashoffset = offset;
+
+            if (percentage >= 100) {
+                circle.style.stroke = 'var(--success-color)';
+                percentageSpan.style.color = 'var(--success-color)';
+            } else if (percentage > 0) {
+                const greenComponent = Math.round(50 + (percentage * 1.5));
+                const redComponent = Math.round(150 - (percentage * 1.0));
+                const r = Math.max(0, Math.min(255, redComponent));
+                const g = Math.max(0, Math.min(255, greenComponent));
+                const b = 50;
+                circle.style.stroke = `rgb(${r}, ${g}, ${b})`;
+                percentageSpan.style.color = `rgb(${r}, ${g}, ${b})`;
+            } else { // percentage === 0
+                circle.style.stroke = 'var(--text-color-muted)';
+                percentageSpan.style.color = 'var(--text-color-muted)';
+            }
+        }
+    } else if (isHorizontalBar) {
+        const progressBarFill = indicatorElement.querySelector('.horizontal-progress-bar-fill');
+        const percentageSpan = indicatorElement.querySelector('.horizontal-progress-percentage');
+
+        if (!progressBarFill || !percentageSpan) return;
+
+        if (directPercentage === null) { // Wenn DB-Wert null ist
+            percentageSpan.textContent = (processedCount > 0 && percentage === 0) ? '0%' : (percentage === 0 ? '--%' : `${Math.round(percentage)}%`);
+            if (percentage === 0 && processedCount === 0) percentageSpan.textContent = '--%';
+
+            progressBarFill.style.width = `${percentage}%`; // Kann 0% sein oder ein berechneter Wert
+            progressBarFill.style.backgroundColor = 'var(--text-color-muted)';
+            percentageSpan.style.color = 'var(--text-color-muted)';
+
+            if (percentage > 0) {
+                // Farbverlauf für > 0 %
+                const greenComponent = Math.round(50 + (percentage * 1.5));
+                const redComponent = Math.round(150 - (percentage * 1.0));
+                const r = Math.max(0, Math.min(255, redComponent));
+                const g = Math.max(0, Math.min(255, greenComponent));
+                const b = 50;
+                progressBarFill.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                percentageSpan.style.color = `rgb(${r}, ${g}, ${b})`;
+            }
+
+        } else { // directPercentage ist eine Zahl
+            percentageSpan.textContent = `${Math.round(percentage)}%`;
+            progressBarFill.style.width = `${percentage}%`;
+
+            if (percentage >= 100) {
+                progressBarFill.style.backgroundColor = 'var(--success-color)';
+                percentageSpan.style.color = 'var(--success-color)';
+            } else if (percentage > 0) {
+                const greenComponent = Math.round(50 + (percentage * 1.5));
+                const redComponent = Math.round(150 - (percentage * 1.0));
+                const r = Math.max(0, Math.min(255, redComponent));
+                const g = Math.max(0, Math.min(255, greenComponent));
+                const b = 50;
+                progressBarFill.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                percentageSpan.style.color = `rgb(${r}, ${g}, ${b})`;
+            } else { // percentage === 0
+                progressBarFill.style.backgroundColor = 'var(--text-color-muted)';
+                percentageSpan.style.color = 'var(--text-color-muted)';
+            }
+        }
+    }
+}
+
+async function fetchAndApplyTotalHouseNumbers(indicatorElement, streetName, postalCode, processedCount) {
+    const totalCount = await fetchTotalHouseNumbersFromOverpass(streetName, postalCode);
+    if (document.body.contains(indicatorElement)) {
+        updateStreetProgressUI(indicatorElement, { processedCount: processedCount, totalCount: totalCount });
+    }
+}
+
+// --- NEUE FUNKTION zum Berechnen und Speichern des Fortschritts ---
+async function calculateAndUpdateStreetProgress(streetId, streetName, postalCode) {
+    if (!streetId || !streetName || !postalCode) {
+        // console.warn("calculateAndUpdateStreetProgress: Fehlende Argumente.");
+        showErrorNotification("calculateAndUpdateStreetProgress: Fehlende Argumente.");
+        return;
+    }
+
+    // Kurze Verzögerung, um sicherzustellen, dass alle DB-Operationen (save/delete entry) abgeschlossen sind,
+    // bevor wir die Einträge neu zählen.
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+
+    console.log(`Berechne und speichere Fortschritt für Straße ID ${streetId}: ${streetName}. Overpass API wird ggf. aufgerufen.`);
+
+    try {
+        const { data: entries, error: entriesError } = await supabaseClient
+            .from('house_entries')
+            .select('house_number', { count: 'exact' }) // {count: 'exact'} um unnötige Datenübertragung zu vermeiden
+            .eq('street_id', streetId);
+
+        if (entriesError) throw entriesError;
+
+        const uniqueHouseNumbers = new Set();
+        (entries || []).forEach(entry => {
+            if (entry.house_number) {
+                uniqueHouseNumbers.add(String(entry.house_number).trim().toLowerCase());
+            }
+        });
+        const uniqueProcessedAddresses = uniqueHouseNumbers.size;
+
+        const totalCountOverpass = await fetchTotalHouseNumbersFromOverpass(streetName, postalCode);
+
+        let percentToStore = null; 
+
+        if (totalCountOverpass !== null && totalCountOverpass > 0) {
+            percentToStore = Math.round((uniqueProcessedAddresses / totalCountOverpass) * 100);
+            percentToStore = Math.min(Math.max(percentToStore, 0), 100); 
+        } else if (totalCountOverpass === 0 && uniqueProcessedAddresses > 0) {
+            percentToStore = 100;
+        }
+        
+
+        const { error: updateError } = await supabaseClient
+            .from('streets')
+            .update({ percent_completed: percentToStore })
+            .eq('id', streetId);
+
+        if (updateError) {
+            console.error(`Fehler beim DB-Update von percent_completed für Street ID ${streetId}:`, updateError);
+            showErrorNotification("Fehler beim Speichern des Straßenfortschritts.");
+        } else {
+            console.log(`percent_completed für Street ID ${streetId} (${streetName}) auf ${percentToStore} aktualisiert.`);
+            const streetKey = `${postalCode}-${streetName}`;
+            
+            if (streetProgressData.has(streetKey)) {
+                const currentData = streetProgressData.get(streetKey);
+                currentData.percentCompletedFromDB = percentToStore;
+                currentData.processedCount = uniqueProcessedAddresses; // Wichtig: auch processedCount aktualisieren
+            } else {
+                streetProgressData.set(streetKey, {
+                    processedCount: uniqueProcessedAddresses,
+                    percentCompletedFromDB: percentToStore
+                });
+            }
+            
+            if (document.getElementById('mainView').classList.contains('active-view') &&
+                streetListContainer && streetListContainer.style.display !== 'none') {
+                const items = streetListContainer.querySelectorAll('.street-item');
+                items.forEach(item => {
+                    const nameSpan = item.querySelector('.street-item-name');
+                    if (nameSpan && nameSpan.textContent === streetName) {
+                        const progressIndicator = item.querySelector('.street-item-progress');
+                        if (progressIndicator) {
+                            updateStreetProgressUI(progressIndicator, {
+                                processedCount: uniqueProcessedAddresses,
+                                totalCount: totalCountOverpass, 
+                                directPercentage: percentToStore
+                            });
+                        }
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error(`Fehler in calculateAndUpdateStreetProgress für ${streetName} (ID: ${streetId}):`, error);
+        showErrorNotification(`Fehler beim Aktualisieren des Fortschritts für ${streetName}.`);
+    }
+}
+
+
+// In selectStreet, saveOrUpdateHouseEntry, deleteHouseEntry müssen wir nun
+// calculateAndUpdateStreetProgress aufrufen.
+
+async function showStreetStatsModal() {
+    const modalOverlay = document.getElementById('streetStatsModalOverlay');
+    const modalBody = document.getElementById('streetStatsModalBody');
+    const modalTitle = document.getElementById('streetStatsModalTitle');
+
+    if (!modalOverlay || !modalBody || !modalTitle) {
+        console.error("Modal-Elemente nicht gefunden.");
+        return;
+    }
+
+    if (!currentSelectedStreetName || !currentSelectedPostalCode) {
+        showErrorNotification("Keine Straße ausgewählt, um Statistiken anzuzeigen.");
+        return;
+    }
+
+    modalTitle.textContent = `Auswertung für: ${escapeHtml(currentSelectedStreetName)}`;
+    modalBody.innerHTML = '<div class="loading-spinner-view" style="margin: 20px auto;"></div><p style="text-align:center;">Lade Daten...</p>';
+    modalOverlay.style.display = 'flex';
+
+    try {
+        const processedEntriesCount = currentHouseEntries.length; 
+        
+        const uniqueHouseNumbersInCurrentStreet = new Set();
+        currentHouseEntries.forEach(entry => {
+            if (entry.house_number) {
+                uniqueHouseNumbersInCurrentStreet.add(entry.house_number.trim().toLowerCase());
+            }
+        });
+        const uniqueProcessedAddresses = uniqueHouseNumbersInCurrentStreet.size;
+        
+        const totalCountOverpass = await fetchTotalHouseNumbersFromOverpass(currentSelectedStreetName, currentSelectedPostalCode);
+        
+        let minHouseNumberString = null;
+        let maxHouseNumberString = null;
+
+        if (currentHouseEntries.length > 0) {
+            const houseNumberStrings = currentHouseEntries.map(entry => entry.house_number.trim());
+            if (houseNumberStrings.length > 0) {
+                const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+                houseNumberStrings.sort(collator.compare);
+                minHouseNumberString = houseNumberStrings[0];
+                maxHouseNumberString = houseNumberStrings[houseNumberStrings.length - 1];
+            }
+        }
+
+        let modalHtml = `
+            <div class="modal-stats-item">
+                <strong>Anzahl Einträge gesamt:</strong>
+                <span>${processedEntriesCount}</span>
+            </div>
+            <div class="modal-stats-item">
+                <strong>Eindeutig erfasste Adressen:</strong>
+                <span>${uniqueProcessedAddresses}</span>
+            </div>
+            <div class="modal-stats-item">
+                <strong>Hausnummern in Straße (ca. lt. OSM):</strong> 
+                <span>${totalCountOverpass !== null ? totalCountOverpass : 'N/A'}</span>
+            </div>
+            <div class="modal-stats-item">
+                <strong>Kleinste erfasste Hausnr.:</strong>
+                <span>${minHouseNumberString !== null ? escapeHtml(minHouseNumberString) : '-'}</span>
+            </div>
+            <div class="modal-stats-item">
+                <strong>Größte erfasste Hausnr.:</strong>
+                <span>${maxHouseNumberString !== null ? escapeHtml(maxHouseNumberString) : '-'}</span>
+            </div>
+        `;
+
+        let percentageForModalBar = null;
+        if (totalCountOverpass !== null && totalCountOverpass > 0) {
+            percentageForModalBar = Math.min((uniqueProcessedAddresses / totalCountOverpass) * 100, 100);
+            modalHtml += `
+                <div class="modal-stats-item" style="flex-direction: column; align-items: stretch; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
+                    <strong style="margin-bottom: 10px; text-align: left;">Fortschritt (eindeutige Adressen):</strong>
+                    <div class="horizontal-progress-container" id="modalHorizontalProgressContainer">
+                        <div class="horizontal-progress-bar-background">
+                            <div class="horizontal-progress-bar-fill"></div>
+                        </div>
+                        <span class="horizontal-progress-percentage">--%</span>
+                    </div>
+                </div>
+            `;
+        } else if (totalCountOverpass === 0 && uniqueProcessedAddresses > 0) {
+            modalHtml += `
+                <div class="modal-stats-item" style="flex-direction: column; align-items: stretch; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
+                     <strong style="margin-bottom: 10px; text-align: left;">Bearbeitung:</strong>
+                     <span>${uniqueProcessedAddresses} Adr. erfasst (OSM: 0)</span>
+                </div>
+            `;
+        } else if (totalCountOverpass === null && uniqueProcessedAddresses > 0) { // Geändert: Zeige auch wenn OSM null ist, aber Adressen erfasst wurden
+             modalHtml += `
+                <div class="modal-stats-item" style="flex-direction: column; align-items: stretch; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
+                     <strong style="margin-bottom: 10px; text-align: left;">Fortschritt:</strong>
+                     <span>Gesamtzahl für Straße nicht verfügbar. ${uniqueProcessedAddresses} Adr. erfasst.</span>
+                </div>
+            `;
+        } else if (totalCountOverpass === null && uniqueProcessedAddresses === 0) { // Fall: Keine OSM Daten, keine Einträge
+             modalHtml += `
+                <div class="modal-stats-item" style="flex-direction: column; align-items: stretch; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
+                     <strong style="margin-bottom: 10px; text-align: left;">Fortschritt:</strong>
+                     <span>Keine Daten verfügbar.</span>
+                </div>
+            `;
+        }
+
+
+        modalBody.innerHTML = modalHtml;
+
+        if (percentageForModalBar !== null) {
+            const modalProgressContainer = document.getElementById('modalHorizontalProgressContainer');
+            if (modalProgressContainer) {
+                updateStreetProgressUI(modalProgressContainer, { directPercentage: percentageForModalBar });
+            }
+        }
+
+    } catch (error) {
+        console.error("Fehler beim Laden der Modal-Statistiken:", error);
+        modalBody.innerHTML = `<p style="color: var(--danger-color); text-align:center;">Fehler beim Laden der Daten: ${error.message}</p>`;
+    }
+}
+
+function hideStreetStatsModal() {
+    const modalOverlay = document.getElementById('streetStatsModalOverlay');
+    if (modalOverlay) {
+        modalOverlay.style.display = 'none';
+    }
+}
+// --- ENDE Straßen-Statistik-Modal ---
+
+// NEU: Admin User IDs
+const ADMIN_USER_IDS = [
+    'bf667651-4160-4316-96ed-17e1eec28af4',
+    // Weitere Admin-User-IDs hier hinzufügen
+    // Beispiel: '12345678-1234-1234-1234-123456789012',
+    // Beispiel: 'abcdef12-3456-7890-abcd-ef1234567890'
+]; // Array mit allen Admin-User-IDs
+
+// --- NEU: Admin View Funktionen ---
+async function loadAdminData() {
+    if (!currentUser) return;
+
+    // Prüfen, ob der User wirklich Admin ist (doppelte Sicherheit)
+    if (!ADMIN_USER_IDS.includes(currentUser.id)) {
+        showErrorNotification("Zugriff verweigert. Diese Ansicht ist nur für Admins.");
+        switchView('mainView', 'SellX Solutions'); // Zurück zur Hauptansicht
+        if (adminViewSkeleton) adminViewSkeleton.classList.add('hidden');
+        if (adminContent) adminContent.style.display = 'none';
+        return;
+    }
+
+    console.log("Lade Admin-Daten und -Optionen...");
+    if (adminErrorDisplay) adminErrorDisplay.style.display = 'none';
+    // adminLoadingIndicator nicht unbedingt nötig, da wir noch keine Daten laden
+
+    try {
+        // Hier könnten später spezifische Admin-Daten geladen werden.
+        // Für den Moment zeigen wir nur den Inhalt an.
+
+        // NEU: Setze den Titel für die Admin-Ansicht korrekt
+        // Der Titel wird jetzt über switchView gesetzt, diese Zeile ist nicht mehr nötig bzw. sollte
+        // im HTML der AdminView direkt den korrekten Titel haben oder über switchView gesetzt werden.
+        // const adminViewTitleElement = document.querySelector('#adminView .view-header h3');
+        // if (adminViewTitleElement) {
+        //     adminViewTitleElement.textContent = 'Admin Bereich';
+        // }
+
+
+        if (adminContent) adminContent.style.display = 'block';
+        if (adminViewSkeleton) adminViewSkeleton.classList.add('hidden');
+
+    } catch (error) {
+        console.error("Fehler beim Laden der Admin-Ansicht:", error);
+        if (adminErrorDisplay) {
+            adminErrorDisplay.textContent = `Fehler: ${error.message}`;
+            adminErrorDisplay.style.display = 'block';
+        }
+        if (adminViewSkeleton) adminViewSkeleton.classList.add('hidden');
+        if (adminContent) adminContent.style.display = 'none';
+    }
+}
+
+window.exportDataAsPdf = async function(dataType) {
+    if (!ADMIN_USER_IDS.includes(currentUser?.id)) {
+        showErrorNotification("Nur Admins können Daten exportieren.");
+        return;
+    }
+
+    if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined') {
+        showErrorNotification("jsPDF Bibliothek nicht gefunden. Bitte binden Sie sie in die HTML-Datei ein.");
+        console.error("jsPDF is not loaded. Please include it in your HTML file.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const tempDoc = new jsPDF();
+
+    if (typeof tempDoc.autoTable !== 'function') {
+        showErrorNotification("jsPDF-AutoTable Plugin nicht gefunden oder nicht korrekt initialisiert.");
+        console.error("jsPDF-AutoTable plugin is not loaded or initialized correctly.");
+        return;
+    }
+
+    const doc = new jsPDF({ orientation: "landscape" });
+    let data, error, columns, body, title, filename;
+    const timestamp = new Date().toLocaleString('de-DE').replace(/[/:]/g, '-');
+
+    showErrorNotification(`Export für "${dataType}" wird vorbereitet...`);
+
+    try {
+        switch (dataType) {
+            case 'users':
+                title = `Benutzerliste - Exportiert am ${timestamp}`;
+                filename = `Benutzerliste_${timestamp}.pdf`;
+                
+                const { data: allAuthUsersForPdf, error: authUsersPdfError } = await supabaseClient
+                    .from('users', { schema: 'auth' }) // Explizit das 'auth'-Schema verwenden
+                    .select('id, email, raw_user_meta_data, created_at');
+
+                if (authUsersPdfError || !allAuthUsersForPdf || allAuthUsersForPdf.length === 0) {
+                    showErrorNotification("Direkte Abfrage an 'users' (auth.users) für PDF-Export fehlgeschlagen oder keine Daten: " + (authUsersPdfError ? authUsersPdfError.message : 'Keine Daten'));
+                    return;
+                }
+                data = allAuthUsersForPdf;
+
+                columns = [
+                    { header: 'User ID', dataKey: 'user_id' },
+                    { header: 'Anzeigename', dataKey: 'display_name' },
+                    { header: 'E-Mail', dataKey: 'email' },
+                    { header: 'Erstellt am', dataKey: 'created_at_auth' } 
+                ];
+                body = data.map(user => ({
+                    user_id: user.id || 'N/A', 
+                    display_name: user.raw_user_meta_data?.display_name || 'N/A', 
+                    email: user.email || 'N/A', 
+                    created_at_auth: user.created_at ? new Date(user.created_at).toLocaleString('de-DE') : 'N/A'
+                }));
+                break;
+
+            case 'streets':
+                title = `Straßenverzeichnis - Exportiert am ${timestamp}`;
+                filename = `Strassenverzeichnis_${timestamp}.pdf`;
+                ({ data, error } = await supabaseClient
+                    .from('streets')
+                    .select('id, name, postal_code, created_at, percent_completed')
+                    .order('postal_code')
+                    .order('name')
+                );
+                if (error) throw error;
+                 if (!data || data.length === 0) {
+                    showErrorNotification("Keine Straßendaten zum Exportieren gefunden."); return;
+                }
+                columns = [
+                    { header: 'ID', dataKey: 'id' },
+                    { header: 'Name', dataKey: 'name' },
+                    { header: 'PLZ', dataKey: 'postal_code' },
+                    { header: 'Fortschritt (%)', dataKey: 'percent_completed'},
+                    { header: 'Erstellt am', dataKey: 'created_at' }
+                ];
+                body = data.map(street => ({
+                    id: street.id,
+                    name: street.name || 'N/A',
+                    postal_code: street.postal_code || 'N/A',
+                    percent_completed: street.percent_completed !== null ? street.percent_completed : 'N/A',
+                    created_at: street.created_at ? new Date(street.created_at).toLocaleString('de-DE') : 'N/A'
+                }));
+                break;
+
+            case 'house_entries':
+                title = `Hausnummern-Einträge - Exportiert am ${timestamp}`;
+                filename = `Hausnummern_Eintraege_${timestamp}.pdf`;
+                const { data: entriesData, error: entriesError } = await supabaseClient
+                    .from('house_entries')
+                    .select('*, streets(name, postal_code)') 
+                    .order('created_at', { ascending: false });
+
+                if (entriesError) throw entriesError;
+                if (!entriesData || entriesData.length === 0) {
+                    showErrorNotification("Keine Hausnummern-Einträge zum Exportieren gefunden."); return;
+                }
+
+                const creatorIds = [...new Set(entriesData.map(e => e.creator_id).filter(id => id))];
+                const creatorNamesMap = new Map();
+
+                if (creatorIds.length > 0) {
+                    const { data: namesData, error: namesError } = await supabaseClient
+                        .from('users', { schema: 'auth' }) // Explizit das 'auth'-Schema verwenden
+                        .select('id, email, raw_user_meta_data')
+                        .in('id', creatorIds);
+                    
+                    if (namesError) {
+                        showErrorNotification("Fehler beim Abrufen von User-Namen für PDF (house_entries): " + namesError.message);
+                    }
+                    else if (namesData) {
+                        namesData.forEach(u => creatorNamesMap.set(u.id, u.raw_user_meta_data?.display_name || u.email));
+                    }
+                }
+                
+                columns = [
+                    { header: 'ID', dataKey: 'id' },
+                    { header: 'Straße', dataKey: 'street_name' },
+                    { header: 'PLZ', dataKey: 'postal_code' },
+                    { header: 'Hausnr.', dataKey: 'house_number' },
+                    { header: 'Name (Tür)', dataKey: 'name' },
+                    { header: 'Status', dataKey: 'status' },
+                    { header: 'Notizen', dataKey: 'notes' },
+                    { header: 'Erstellt von', dataKey: 'creator_info'}, // Geändert
+                    { header: 'Erstellt am', dataKey: 'created_at' },
+                    { header: 'Letzter Besuch', dataKey: 'last_visit_date' }
+                ];
+                body = entriesData.map(entry => ({
+                    id: entry.id,
+                    street_name: entry.streets?.name || 'N/A',
+                    postal_code: entry.streets?.postal_code || 'N/A',
+                    house_number: entry.house_number || 'N/A',
+                    name: entry.name || 'N/A',
+                    status: entry.status || 'N/A',
+                    notes: entry.notes || 'N/A',
+                    creator_info: creatorNamesMap.get(entry.creator_id) || entry.creator_id.substring(0,8) + '...' || 'N/A',
+                    created_at: entry.created_at ? new Date(entry.created_at).toLocaleString('de-DE') : 'N/A',
+                    last_visit_date: entry.last_visit_date ? new Date(entry.last_visit_date).toLocaleDateString('de-DE') : 'N/A'
+                }));
+                break;
+
+            case 'work_time_entries':
+                title = `Zeiterfassungseinträge - Exportiert am ${timestamp}`;
+                filename = `Zeiterfassung_${timestamp}.pdf`;
+                const { data: workTimeData, error: workTimeError } = await supabaseClient
+                    .from('work_time_entries')
+                    .select('*') 
+                    .order('start_time', { ascending: false });
+
+                if (workTimeError) throw workTimeError;
+                if (!workTimeData || workTimeData.length === 0) {
+                    showErrorNotification("Keine Zeiterfassungseinträge zum Exportieren gefunden."); return;
+                }
+
+                const workTimeUserIds = [...new Set(workTimeData.map(e => e.user_id).filter(id => id))];
+                const workTimeUserNamesMap = new Map();
+                 if (workTimeUserIds.length > 0) {
+                     const { data: namesData, error: namesError } = await supabaseClient
+                        .from('users', { schema: 'auth' }) // Explizit das 'auth'-Schema verwenden
+                        .select('id, email, raw_user_meta_data')
+                        .in('id', workTimeUserIds);
+
+                    if (namesError) {
+                        showErrorNotification("Fehler beim Abrufen von User-Namen für PDF (work_time_entries): " + namesError.message);
+                    }
+                    else if (namesData) {
+                        namesData.forEach(u => workTimeUserNamesMap.set(u.id, u.raw_user_meta_data?.display_name || u.email));
+                    }
+                }
+
+                columns = [
+                    { header: 'ID', dataKey: 'id' },
+                    { header: 'Benutzer', dataKey: 'user_info' }, // Geändert
+                    { header: 'Startzeit', dataKey: 'start_time' },
+                    { header: 'Endzeit', dataKey: 'end_time' },
+                    { header: 'Dauer (Min)', dataKey: 'duration_minutes' },
+                    { header: 'Start-Ort', dataKey: 'start_location' },
+                    { header: 'End-Ort', dataKey: 'end_location' }
+                ];
+                body = workTimeData.map(entry => ({
+                    id: entry.id,
+                    user_info: workTimeUserNamesMap.get(entry.user_id) || entry.user_id.substring(0,8) + '...' || 'N/A',
+                    start_time: entry.start_time ? new Date(entry.start_time).toLocaleString('de-DE') : 'N/A',
+                    end_time: entry.end_time ? new Date(entry.end_time).toLocaleString('de-DE') : 'N/A',
+                    duration_minutes: entry.duration_minutes !== null ? entry.duration_minutes : 'N/A',
+                    start_location: entry.start_location || 'N/A',
+                    end_location: entry.end_location || 'N/A'
+                }));
+                break;
+
+            case 'registration_codes':
+                title = `Registrierungscodes - Exportiert am ${timestamp}`;
+                filename = `Registrierungscodes_${timestamp}.pdf`;
+                 const { data: regCodesData, error: regCodesError } = await supabaseClient
+                    .from('registration_codes')
+                    .select('*') 
+                    .order('created_at', { ascending: false });
+
+                if (regCodesError) throw regCodesError;
+                if (!regCodesData || regCodesData.length === 0) {
+                    showErrorNotification("Keine Registrierungscodes zum Exportieren gefunden."); return;
+                }
+
+                const regCodeUserIds = [...new Set(regCodesData.map(c => c.used_by).filter(id => id))];
+                const regCodeUserNamesMap = new Map();
+                 if (regCodeUserIds.length > 0) {
+                     const { data: namesData, error: namesError } = await supabaseClient
+                        .from('users', { schema: 'auth' }) // Explizit das 'auth'-Schema verwenden
+                        .select('id, email, raw_user_meta_data')
+                        .in('id', regCodeUserIds);
+                    
+                    if (namesError) {
+                        showErrorNotification("Fehler beim Abrufen von User-Namen für PDF (registration_codes): " + namesError.message);
+                    }
+                    else if (namesData) {
+                        namesData.forEach(u => regCodeUserNamesMap.set(u.id, u.raw_user_meta_data?.display_name || u.email));
+                    }
+                }
+
+                columns = [
+                    { header: 'ID', dataKey: 'id' },
+                    { header: 'Code', dataKey: 'code_value' },
+                    { header: 'Benutzt', dataKey: 'is_used' },
+                    { header: 'Benutzt von', dataKey: 'used_by_info' }, // Geändert
+                    { header: 'Benutzt am', dataKey: 'used_at' },
+                    { header: 'Erstellt am', dataKey: 'created_at' }
+                ];
+                body = regCodesData.map(code => ({
+                    id: code.id,
+                    code_value: code.code_value,
+                    is_used: code.is_used ? 'Ja' : 'Nein',
+                    used_by_info: code.used_by ? (regCodeUserNamesMap.get(code.used_by) || code.used_by.substring(0,8) + '...' || 'N/A') : 'N/A',
+                    used_at: code.used_at ? new Date(code.used_at).toLocaleString('de-DE') : 'N/A',
+                    created_at: code.created_at ? new Date(code.created_at).toLocaleString('de-DE') : 'N/A'
+                }));
+                break;
+
+            default:
+                showErrorNotification(`Unbekannter Datentyp für Export: "${dataType}"`);
+                return;
+        }
+
+        // PDF generieren
+        doc.setFontSize(18);
+        doc.text(title, 14, 22);
+        doc.setFontSize(10);
+        doc.text(`Gesamtzahl Einträge: ${body.length}`, 14, 30);
+
+
+        doc.autoTable({
+            columns: columns,
+            body: body,
+            startY: 35,
+            theme: 'striped', 
+            headStyles: { fillColor: [22, 160, 133] }, 
+            alternateRowStyles: { fillColor: [240, 240, 240] },
+            styles: { fontSize: 7, cellPadding: 1.5, halign: 'left' }, 
+            columnStyles: {
+                // Allgemeine ID-Spalte etwas schmaler
+                id: { cellWidth: 15, halign: 'center' },
+                // Spezifische Anpassungen pro Exporttyp sind ggf. nötig
+                // Beispiel für 'users' Export:
+                user_id: { cellWidth: 45 },
+                display_name: { cellWidth: 40 },
+                email: { cellWidth: 50 },
+                created_at_auth: { cellWidth: 30 },
+                // Beispiel für 'streets' Export:
+                name: { cellWidth: 50 },
+                postal_code: { cellWidth: 20, halign: 'center' },
+                percent_completed: {cellWidth: 25, halign: 'right'},
+                // Beispiel für 'house_entries' Export:
+                street_name: {cellWidth: 40},
+                house_number: {cellWidth: 15, halign: 'center'},
+                status: {cellWidth: 20},
+                creator_info: {cellWidth: 30},
+                // Beispiel für 'work_time_entries' Export:
+                user_info: {cellWidth: 35},
+                start_time: {cellWidth: 30},
+                end_time: {cellWidth: 30},
+                duration_minutes: {cellWidth: 20, halign: 'right'},
+                // Notizen und Orte können variieren
+                notes: { cellWidth: 'auto' },
+                start_location: { cellWidth: 'auto' },
+                end_location: { cellWidth: 'auto' }
+            },
+            didDrawPage: function (data) {
+                let str = "Seite " + doc.internal.getNumberOfPages();
+                if (typeof doc.putTotalPages === 'function') {
+                    str = str + " von " + "{totalPages}";
+                }
+                doc.setFontSize(10);
+                doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+                 doc.text(`Exportiert von: ${currentUser.user_metadata?.display_name || currentUser.email}`, doc.internal.pageSize.width - data.settings.margin.right, doc.internal.pageSize.height - 10, { align: 'right'});
+            }
+        });
+         if (typeof doc.putTotalPages === 'function') {
+            doc.putTotalPages("{totalPages}");
+        }
+
+        doc.save(filename);
+        showErrorNotification(`Export für "${dataType}" erfolgreich als ${filename} heruntergeladen.`);
+
+    } catch (err) {
+        console.error(`Fehler beim PDF-Export für "${dataType}":`, err);
+        showErrorNotification(`Fehler beim Export für "${dataType}": ${err.message}`);
+    }
+};
+
+// NEU: Hilfsfunktion zur Erkennung von "Invalid Refresh Token"-Fehlern
+function isInvalidRefreshTokenError(error) {
+    return error &&
+           error.name === 'AuthApiError' && // Supabase-spezifischer Fehlertyp
+           error.status === 400 &&
+           error.message &&
+           error.message.toLowerCase().includes('invalid refresh token');
+}
+
+// --- NEUE FUNKTION für die "Heute"-Zusammenfassung ---
+async function updateTodaySummary() {
+    if (!currentUser || !todayTotalWork) {
+        // // console.warn("updateTodaySummary: User oder todayTotalWork Element nicht gefunden.");
+        // showErrorNotification("updateTodaySummary: User oder todayTotalWork Element nicht gefunden.");
+        return;
+    }
+
+    const todayDateString = getLocalDateString(new Date());
+    const startDate = new Date(todayDateString + "T00:00:00Z"); // Verwende Z für UTC
+    const endDate = new Date(todayDateString + "T23:59:59.999Z"); // Verwende Z für UTC
+
+    try {
+        const { data: entries, error } = await supabaseClient
+            .from('work_time_entries')
+            .select('duration_minutes')
+            .eq('user_id', currentUser.id)
+            .gte('start_time', startDate.toISOString())
+            .lte('start_time', endDate.toISOString()) // Einträge, die heute gestartet wurden (UTC-basiert)
+            .not('duration_minutes', 'is', null); // Nur abgeschlossene Einträge
+
+        if (error) throw error;
+
+        let totalWorkMinutesToday = 0;
+        if (entries) {
+            entries.forEach(entry => {
+                if (entry.duration_minutes) { // Zusätzliche Prüfung
+                    totalWorkMinutesToday += entry.duration_minutes;
+                }
+            });
+        }
+        todayTotalWork.textContent = formatMinutesToHM(totalWorkMinutesToday);
+
+    } catch (err) {
+        console.error("Error updating today's work summary:", err);
+        if (todayTotalWork) todayTotalWork.textContent = 'Fehler';
+    }
+}
+// --- ENDE NEUE FUNKTION ---
+
+// NEU: Funktion für den Navigationsbutton zur Arbeitszeitauswertung
+window.navigateToWorkTimeEvaluation = function() {
+    if (!ADMIN_USER_IDS.includes(currentUser?.id)) {
+        showErrorNotification("Nur Admins können diese Auswertung einsehen.");
+        return;
+    }
+    switchView('workTimeEvaluationView', 'Arbeitszeitauswertung');
+}
+
+// --- NEUE FUNKTIONEN für Arbeitszeitauswertung ---
+
+async function loadWorkTimeEvaluationData() {
+    if (!ADMIN_USER_IDS.includes(currentUser?.id)) {
+        showErrorNotification("Zugriff verweigert.");
+        switchView('adminView', 'Admin Bereich'); 
+        return;
+    }
+
+    if (workTimeEvalViewSkeleton) workTimeEvalViewSkeleton.classList.add('hidden');
+    if (userEvalList) userEvalList.innerHTML = '<div class="skeleton-list-item" style="margin-bottom: 8px;"></div><div class="skeleton-list-item" style="margin-bottom: 8px;"></div><div class="skeleton-list-item" style="margin-bottom: 8px;"></div>';
+
+    try {
+        let usersToDisplay = [];
+        if (ADMIN_USER_IDS.includes(currentUser?.id)) {
+            // Versuche zuerst, die User-Daten über die Leaderboard-Funktion zu bekommen
+            console.log("Versuche User-Daten für Arbeitszeitauswertung über 'get_leaderboard_geschrieben_v1' zu laden...");
+            const { data: leaderboardUsers, error: rpcError } = await supabaseClient
+                .rpc('get_leaderboard_geschrieben_v1');
+
+            if (rpcError) {
+                console.warn("RPC 'get_leaderboard_geschrieben_v1' für User-Liste fehlgeschlagen:", rpcError.message, ". Nutze Fallback (auth.users).");
+                // Fallback: auth.users abfragen
+                const { data: allAuthUsers, error: authUsersError } = await supabaseClient
+                    .from('users', { schema: 'auth' })
+                    .select('id, email, raw_user_meta_data, created_at');
+
+                if (authUsersError) {
+                    console.error("Fehler beim Abrufen aller Benutzer für Arbeitszeitauswertung (auth.users):", authUsersError);
+                    showErrorNotification("Konnte Benutzerdetails nicht laden (auth.users): " + authUsersError.message + ". Versuche zweiten Fallback (User-IDs).");
+                    // Zweiter Fallback: Nur User-IDs aus work_time_entries
+                    const { data: workEntries, error: entriesError } = await supabaseClient
+                        .from('work_time_entries')
+                        .select('user_id');
+                    if (entriesError) throw entriesError;
+
+                    if (workEntries && workEntries.length > 0) {
+                        const uniqueUserIds = [...new Set(workEntries.map(entry => entry.user_id).filter(id => id))];
+                        usersToDisplay = uniqueUserIds.map(userId => ({
+                            user_id: userId,
+                            display_name: `User ID: ${userId.substring(0, 8)}...`,
+                            email: null
+                        }));
+                        console.log("Zweiter Fallback für Arbeitszeitauswertung: Zeige User-IDs an.");
+                    }
+                } else if (allAuthUsers) {
+                    usersToDisplay = allAuthUsers.map(u => ({
+                        user_id: u.id,
+                        display_name: u.raw_user_meta_data?.display_name || u.email,
+                        email: u.email
+                    }));
+                }
+            } else if (leaderboardUsers && leaderboardUsers.length > 0) {
+                console.log("User-Daten erfolgreich über 'get_leaderboard_geschrieben_v1' geladen.");
+                usersToDisplay = leaderboardUsers.map(user => ({
+                    user_id: user.user_id, // Annahme: RPC gibt user_id zurück
+                    display_name: user.display_name, // Annahme: RPC gibt display_name zurück
+                    email: null // E-Mail ist in Leaderboard-Daten typischerweise nicht enthalten
+                }));
+                // Entferne Duplikate, falls mehrere Einträge pro User im Leaderboard wären (sollte nicht der Fall sein)
+                const uniqueUserMap = new Map();
+                usersToDisplay.forEach(user => {
+                    if (!uniqueUserMap.has(user.user_id)) {
+                        uniqueUserMap.set(user.user_id, user);
+                    }
+                });
+                usersToDisplay = Array.from(uniqueUserMap.values());
+
+            } else {
+                 console.warn("RPC 'get_leaderboard_geschrieben_v1' gab keine User-Daten zurück. Nutze Fallback (auth.users).");
+                 // Fallback, falls RPC leer ist, aber keinen Fehler wirft
+                 const { data: allAuthUsers, error: authUsersError } = await supabaseClient
+                    .from('users', { schema: 'auth' })
+                    .select('id, email, raw_user_meta_data, created_at');
+                if (authUsersError) throw authUsersError; // Fehler hier weiterwerfen, wenn Fallback auch fehlschlägt
+                if (allAuthUsers) {
+                    usersToDisplay = allAuthUsers.map(u => ({
+                        user_id: u.id,
+                        display_name: u.raw_user_meta_data?.display_name || u.email,
+                        email: u.email
+                    }));
+                }
+            }
+        } else {
+            showErrorNotification("Zugriff verweigert. Diese Aktion ist nur für Admins.");
+            return;
+        }
+        
+        usersToDisplay.sort((a, b) => {
+            const nameA = a.display_name || a.email || a.user_id;
+            const nameB = b.display_name || b.email || b.user_id;
+            return nameA.localeCompare(nameB);
+        });
+
+        displayUserListForEval(usersToDisplay);
+        if (userListForEvalContainer) userListForEvalContainer.style.display = 'block';
+        if (userDetailEvalContainer) userDetailEvalContainer.style.display = 'none';
+
+    } catch (error) {
+        console.error("Fehler beim Laden der Mitarbeiter für Arbeitszeitauswertung:", error);
+        if (userEvalList) userEvalList.innerHTML = `<p class="error-message">Fehler beim Laden der Mitarbeiter: ${error.message}</p>`;
+        showErrorNotification("Fehler beim Laden der Mitarbeiterliste.");
+    }
+}
+
+function displayUserListForEval(users) {
+    if (!userEvalList) return;
+    userEvalList.innerHTML = ''; 
+
+    if (!users || users.length === 0) {
+        userEvalList.innerHTML = '<p>Keine Mitarbeiter gefunden.</p>'; // Angepasste Nachricht
+        return;
+    }
+
+    const ul = document.createElement('ul');
+    ul.className = 'evaluation-user-list'; 
+
+    users.forEach(user => {
+        const li = document.createElement('li');
+        li.className = 'evaluation-user-item';
+        
+        const displayName = user.display_name || user.email || user.user_id; // Priorität: Name, dann E-Mail, dann ID
+        li.textContent = displayName;
+        li.dataset.userId = user.user_id;
+        li.dataset.userName = displayName; 
+        li.onclick = () => selectUserForWorkTimeEvaluation(user.user_id, displayName);
+        ul.appendChild(li);
+    });
+    userEvalList.appendChild(ul);
+}
+
+async function selectUserForWorkTimeEvaluation(userId, userName) {
+    console.log(`Lade Arbeitszeiten für ${userName} (ID: ${userId})`);
+    selectedUserIdForEval = userId;
+    selectedUserNameForEval = userName; 
+
+    if (userDetailEvalName) userDetailEvalName.textContent = `Arbeitszeiten für: ${escapeHtml(userName)}`;
+    if (monthlyWorkTimeTableContainer) monthlyWorkTimeTableContainer.innerHTML = ''; 
+    if (monthlyWorkTimeSkeleton) monthlyWorkTimeSkeleton.style.display = 'block';
+    if (userDetailEvalContainer) userDetailEvalContainer.style.display = 'block';
+    if (userListForEvalContainer) userListForEvalContainer.style.display = 'none'; 
+
+    try {
+        const { data: entries, error } = await supabaseClient
+            .from('work_time_entries')
+            .select('start_time, end_time, duration_minutes, start_location, end_location') // Standorte mitladen
+            .eq('user_id', userId)
+            .not('duration_minutes', 'is', null) 
+            .order('start_time', { ascending: true }); // Älteste zuerst für einfachere Tagesgruppierung
+
+        if (error) throw error;
+
+        processAndDisplayMonthlyWorkTime(entries);
+
+    } catch (error) {
+        console.error(`Fehler beim Laden der Arbeitszeiten für ${userName}:`, error);
+        if (monthlyWorkTimeTableContainer) monthlyWorkTimeTableContainer.innerHTML = `<p class="error-message">Fehler beim Laden der Arbeitszeiten: ${error.message}</p>`;
+        showErrorNotification(`Fehler beim Laden der Arbeitszeiten für ${userName}.`);
+    } finally {
+        if (monthlyWorkTimeSkeleton) monthlyWorkTimeSkeleton.style.display = 'none';
+    }
+}
+
+function processAndDisplayMonthlyWorkTime(allEntries) {
+    if (!monthlyWorkTimeTableContainer) return;
+    monthlyWorkTimeTableContainer.innerHTML = '';
+
+    if (!allEntries || allEntries.length === 0) {
+        monthlyWorkTimeTableContainer.innerHTML = '<p>Keine abgeschlossenen Arbeitszeiteinträge für diesen Mitarbeiter gefunden.</p>';
+        return;
+    }
+
+    // Einträge nach Monat gruppieren und Gesamtzeiten berechnen
+    const monthlyAggregatedData = allEntries.reduce((acc, entry) => {
+        if (entry.start_time && typeof entry.duration_minutes === 'number') {
+            const startDate = new Date(entry.start_time);
+            const year = startDate.getFullYear();
+            const month = startDate.getMonth();
+            const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+            if (!acc[key]) {
+                acc[key] = { year, month, totalMinutes: 0, entryCount: 0, entries: [] };
+            }
+            acc[key].totalMinutes += entry.duration_minutes;
+            acc[key].entryCount++;
+            acc[key].entries.push(entry); // Die einzelnen Einträge für diesen Monat speichern
+        }
+        return acc;
+    }, {});
+
+    const sortedMonthKeys = Object.keys(monthlyAggregatedData).sort().reverse(); 
+
+    if (sortedMonthKeys.length === 0) {
+         monthlyWorkTimeTableContainer.innerHTML = '<p>Keine auswertbaren Monatsdaten gefunden.</p>';
+         return;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'styled-table monthly-work-table';
+
+    const thead = table.createTHead();
+    const headerRow = thead.insertRow();
+    const headers = ['Monat/Jahr', 'Gesamtstunden', 'Einträge', 'Details'];
+    headers.forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        if (text === 'Details') th.style.textAlign = 'center';
+        headerRow.appendChild(th);
+    });
+
+    const tbody = table.createTBody();
+    sortedMonthKeys.forEach(monthKey => {
+        const monthData = monthlyAggregatedData[monthKey];
+        const monthRow = tbody.insertRow();
+        monthRow.className = 'month-summary-row';
+
+        const monthName = new Date(monthData.year, monthData.month).toLocaleString('de-DE', { month: 'long' });
+
+        monthRow.insertCell().textContent = `${monthName} ${monthData.year}`;
+        monthRow.insertCell().textContent = formatMinutesToHM(monthData.totalMinutes);
+        monthRow.insertCell().textContent = monthData.entryCount;
+        
+        const detailCell = monthRow.insertCell();
+        detailCell.style.textAlign = 'center';
+        const toggleButton = document.createElement('button');
+        toggleButton.className = 'toggle-details-button buttonnumpad icon-button';
+        toggleButton.innerHTML = '<span class="material-icons">expand_more</span>';
+        toggleButton.title = "Tagesdetails anzeigen/verbergen";
+        detailCell.appendChild(toggleButton);
+
+        // Versteckte Zeile für Tagesdetails
+        const dailyDetailRow = tbody.insertRow();
+        dailyDetailRow.className = 'daily-detail-row hidden-row';
+        const dailyDetailCell = dailyDetailRow.insertCell();
+        dailyDetailCell.colSpan = headers.length; // Nimmt die gesamte Breite ein
+        const dailyDetailContainer = document.createElement('div');
+        dailyDetailContainer.className = 'daily-detail-container';
+        dailyDetailCell.appendChild(dailyDetailContainer);
+        
+        toggleButton.onclick = () => {
+            dailyDetailRow.classList.toggle('hidden-row');
+            toggleButton.innerHTML = dailyDetailRow.classList.contains('hidden-row') 
+                ? '<span class="material-icons">expand_more</span>' 
+                : '<span class="material-icons">expand_less</span>';
+            if (!dailyDetailRow.classList.contains('hidden-row') && dailyDetailContainer.innerHTML === '') {
+                // Lade und zeige Tagesdetails nur beim ersten Ausklappen
+                renderDailyEntriesForMonth(monthData.entries, dailyDetailContainer);
+            }
+        };
+    });
+
+    monthlyWorkTimeTableContainer.appendChild(table);
+}
+
+function renderDailyEntriesForMonth(monthEntries, container) {
+    container.innerHTML = ''; // Vorherigen Inhalt leeren
+
+    if (!monthEntries || monthEntries.length === 0) {
+        container.innerHTML = '<p class="no-daily-entries">Keine Einträge für diesen Monat.</p>';
+        return;
+    }
+
+    // Einträge nach Tag gruppieren
+    const dailyGroupedEntries = monthEntries.reduce((acc, entry) => {
+        const dayKey = getLocalDateString(new Date(entry.start_time));
+        if (!acc[dayKey]) {
+            acc[dayKey] = { entries: [], totalMinutes: 0 };
+        }
+        acc[dayKey].entries.push(entry);
+        if (typeof entry.duration_minutes === 'number') {
+            acc[dayKey].totalMinutes += entry.duration_minutes;
+        }
+        return acc;
+    }, {});
+
+    const sortedDayKeys = Object.keys(dailyGroupedEntries).sort(); // Tage chronologisch sortieren
+
+    sortedDayKeys.forEach(dayKey => {
+        const dayData = dailyGroupedEntries[dayKey];
+        const dayEntries = dayData.entries;
+        const totalMinutesForDay = dayData.totalMinutes;
+
+        const dayContainer = document.createElement('div');
+        dayContainer.className = 'day-entry-group';
+
+        const dayHeader = document.createElement('h5');
+        dayHeader.className = 'day-entry-header';
+        // NEU: Summe der Stunden zum Tages-Header hinzufügen
+        dayHeader.textContent = `Tag: ${formatDateForDisplay(dayKey)} (Gesamt: ${formatMinutesToHM(totalMinutesForDay)})`;
+        dayContainer.appendChild(dayHeader);
+
+        const ul = document.createElement('ul');
+        ul.className = 'daily-entries-list';
+
+        dayEntries.forEach(entry => {
+            const li = document.createElement('li');
+            li.className = 'time-entry-li-detailed'; // Eigene Klasse für detaillierte Liste
+
+            const startTimeFormatted = formatTime(new Date(entry.start_time));
+            const endTimeFormatted = entry.end_time ? formatTime(new Date(entry.end_time)) : 'Laufend';
+            const durationFormatted = entry.duration_minutes ? formatMinutesToHM(entry.duration_minutes) : '-';
+
+            let entryHtml = `
+                <div class="time-entry-main">
+                    <span class="time-entry-times"><strong>${startTimeFormatted} - ${endTimeFormatted}</strong></span>
+                    <span class="time-entry-duration-detailed">Dauer: ${durationFormatted}</span>
+                </div>
+                <div class="time-entry-locations">
+            `;
+
+            if (entry.start_location && isValidHttpUrl(entry.start_location)) {
+                entryHtml += `<button class="location-button buttonnumpad" onclick="window.open('${escapeHtml(entry.start_location)}', '_blank')">
+                                <span class="material-icons">pin_drop</span> Start-Ort
+                              </button>`;
+            } else if (entry.start_location) {
+                 entryHtml += `<span class="location-text">Start: ${escapeHtml(entry.start_location)}</span>`;
+            }
+
+            if (entry.end_location && isValidHttpUrl(entry.end_location)) {
+                entryHtml += `<button class="location-button buttonnumpad" onclick="window.open('${escapeHtml(entry.end_location)}', '_blank')">
+                                <span class="material-icons">pin_drop</span> End-Ort
+                              </button>`;
+            } else if (entry.end_location) {
+                 entryHtml += `<span class="location-text">Ende: ${escapeHtml(entry.end_location)}</span>`;
+            }
+            
+            entryHtml += `</div>`; // Ende .time-entry-locations
+            li.innerHTML = entryHtml;
+            ul.appendChild(li);
+        });
+        dayContainer.appendChild(ul);
+        container.appendChild(dayContainer);
+    });
+}
+
+// Hilfsfunktion um zu prüfen, ob ein String eine gültige HTTP/HTTPS URL ist
+function isValidHttpUrl(string) {
+  let url;
+  try {
+    url = new URL(string);
+  } catch (_) {
+    return false;  
+  }
+  return url.protocol === "http:" || url.protocol === "https:";
+}
+
+// --- ENDE NEUE FUNKTIONEN für Arbeitszeitauswertung ---

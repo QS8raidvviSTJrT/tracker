@@ -12,22 +12,28 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="manifest" href="manifest.json">
-    <script defer src="app.js"></script>
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <script defer src="https://cloud.umami.is/script.js" data-website-id="7d58dfe9-7bf0-4e42-95a2-8d3f8ab66d3c"></script>
+    <script defer src="app.js"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=add_box" />
 </head>
 <body>
+    <div id="notificationContainer" class="notification-container">
+        <!-- Benachrichtigungen werden hier dynamisch eingefügt -->
+    </div>
     <div class="initial-loading-overlay" id="initialLoadingOverlay">
         <div class="loading-spinner"></div>
         <p>Loading...</p>
     </div>
 
     <div class="login-container" id="loginContainer">
-        <img src="180.png" alt="Door Tracker Logo">
+        <img src="images/180.png" alt="Door Tracker Logo">
         <h2>SellX Solutions</h2>
         <h3>Door Tracker</h3>
         <br>
@@ -149,6 +155,13 @@
             </div>
 
             <div id="statsView" class="view">
+                <!-- Admin Button in Stats View - NACH OBEN VERSCHOBEN -->
+                <div id="adminButtonContainerStats" style="display: none;">
+                    <button onclick="switchView('adminView', 'Admin-Bereich')" id="adminSettingsButton" class="button-primary large-admin-button">
+                        <span class="material-icons">admin_panel_settings</span> Admin Bereich
+                    </button>
+                </div>
+
                 <div id="statsLoadingIndicator" class="loading-indicator-view" style="display: none;">
                     <div class="loading-spinner-view"></div>
                 </div>
@@ -306,15 +319,27 @@
                             </select>
                         </div>
                         <hr style="margin: 25px 0; border: none; border-top: 1px solid var(--card-border);">
+                        <div id="userEmailDisplayContainer" style="text-align: center; margin-bottom: 20px; font-size: 0.9em; color: var(--text-color-light);">
+                            <span style="color: var(--text-color-light);">Angemeldet mit </span>
+                            <span id="userEmailDisplay"></span>
+                        </div>
                         <button onclick="logout()" class="settings-logout-button">
                             <span class="material-icons">logout</span> Ausloggen
                         </button>
                         <hr style="margin: 25px 0; border: none; border-top: 1px solid var(--card-border);">
                         <div id="versionHistoryContainer">
                             <h3>Versionshistorie & Neue Features</h3>
-                            <p><strong>Version 1.1 (Aktuell)</strong></p>
+                            <p><strong>Version 1.2 (Aktuell)</strong></p>
+                            <ul>
+                                <li>Fortschrittsanzeige der Straße</li>
+                                <li>Admin-Bereich</li>
+                                <li>Fehlermeldungen</li>
+                            </ul>
+                            <p><strong>Version 1.1</strong></p>
                             <ul>
                                 <li>Dark Mode / Light Mode</li>
+                                <li>Arbeitszeiterfassung</li>
+                                <li>Fehlermeldungen</li>
                             </ul>
                             <p><strong>Version 1.0</strong></p>
                             <ul>
@@ -371,8 +396,7 @@
 
                 <div id="timeTrackingControls" class="content-card">
                     <h2>Arbeitszeiterfassung</h2>
-                    <p>Coming soon...</p>
-                    <!--<div id="timeTrackingStatusDisplay" class="time-tracking-status-display">
+                    <div id="timeTrackingStatusDisplay" class="time-tracking-status-display">
                         <div class="status-item">
                             <span class="status-label">Status:</span>
                             <span id="currentStatusText" class="status-value">Lädt...</span>
@@ -393,9 +417,9 @@
                         <button id="stopWorkButton" onclick="stopWorkTimeTracking()" class="button-stop-time" style="display:none;">
                             <span class="material-icons">stop</span> Stop
                         </button>
-                    </div>-->
+                    </div>
                 </div>
-                <!--
+                
                 <div id="timeTrackingHistory" class="content-card">
                     <div class="history-header">
                         <h3>Zeiterfassungshistorie</h3>
@@ -414,11 +438,84 @@
                     <p id="noHistoryEntriesMessage" class="list-placeholder-message" style="display:none; text-align:center; padding: 15px;">Keine Einträge für diesen Tag.</p>
                 </div>
 
-                <div id="calendarLoadingIndicator" class="loading-indicator-view" style="display: none;">
+                <!--<div id="calendarLoadingIndicator" class="loading-indicator-view" style="display: none;">
+                    <div class="loading-spinner-view"></div>
+                </div>-->
+                <div id="calendarErrorDisplay" class="error-display-view" style="display: none;"></div>
+            </div>
+
+            <div id="adminView" class="view">
+                <div id="adminLoadingIndicator" class="loading-indicator-view" style="display: none;">
                     <div class="loading-spinner-view"></div>
                 </div>
-                <div id="calendarErrorDisplay" class="error-display-view" style="display: none;"></div>
-            </div>-->
+                <div id="adminErrorDisplay" class="error-display-view" style="display: none;"></div>
+
+                <!-- Admin View Skeleton Loader -->
+                <div class="skeleton-loader admin-view-skeleton">
+                    <div class="content-card skeleton-card">
+                        <div class="skeleton skeleton-title" style="width: 60%; margin-bottom: 20px;"></div>
+                        <div class="skeleton skeleton-button" style="height: 40px; margin-bottom: 15px;"></div>
+                        <div class="skeleton skeleton-button" style="height: 40px; margin-bottom: 15px;"></div>
+                        <div class="skeleton skeleton-button" style="height: 40px;"></div>
+                    </div>
+                </div>
+
+                <div id="adminContent" style="display: none;">
+                    <div class="content-card">
+                        <h2>Admin-Bereich: Datenexport</h2>
+                        <p style="margin-bottom: 20px;">Hier können verschiedene Daten als PDF exportiert werden. Diese Funktion ist noch in Entwicklung.</p>
+                        <div class="admin-export-buttons">
+                            <button onclick="exportDataAsPdf('users')" class="button-primary">
+                                <span class="material-icons">people</span> Benutzerdaten exportieren
+                            </button>
+                            <button onclick="exportDataAsPdf('streets')" class="button-primary">
+                                <span class="material-icons">signpost</span> Straßendaten exportieren
+                            </button>
+                            <button onclick="exportDataAsPdf('entries')" class="button-primary">
+                                <span class="material-icons">format_list_numbered</span> Hausnummerneinträge exportieren
+                            </button>
+                            <button onclick="exportDataAsPdf('work_time')" class="button-primary">
+                                <span class="material-icons">timer</span> Arbeitszeiten exportieren
+                            </button>
+                        </div>
+                        <button class="admin-button" onclick="navigateToWorkTimeEvaluation()">
+                            <span class="material-icons">schedule</span>
+                            Arbeitszeitauswertung
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="workTimeEvaluationView" class="view" style="display: none;">
+                <div class="view-header">
+                    <button onclick="switchView('adminView', 'Admin Bereich')" class="back-buttonnumpad" style="padding: 5px 10px; width: auto; height: auto; font-size: 0.9em;">
+                        <span class="material-icons" style="font-size: 1.2em; vertical-align: middle;">arrow_back</span> Zurück
+                    </button>
+                    <h3 id="workTimeEvalViewTitle" style="margin-left: 15px;">Arbeitszeitauswertung</h3>
+                </div>
+                <div class="view-content" style="padding-top: 10px;">
+                    <div id="userListForEvalContainer">
+                        <h4 style="margin-bottom: 10px;">Mitarbeiter auswählen:</h4>
+                        <div id="userEvalList" class="loading-placeholder">
+                            <!-- Skeleton für Mitarbeiterliste -->
+                            <div class="skeleton-list-item" style="margin-bottom: 8px;"></div>
+                            <div class="skeleton-list-item" style="margin-bottom: 8px;"></div>
+                            <div class="skeleton-list-item" style="margin-bottom: 8px;"></div>
+                        </div>
+                    </div>
+                    <div id="userDetailEvalContainer" style="display: none; margin-top: 20px;">
+                        <h4 id="userDetailEvalName" style="margin-bottom: 10px;"></h4>
+                        <div id="monthlyWorkTimeTableContainer">
+                            <!-- Hier kommt die Tabelle oder Liste der Monate hin -->
+                            <div class="loading-placeholder" id="monthlyWorkTimeSkeleton" style="display:none;">
+                                 <div class="skeleton-table-row"></div>
+                                 <div class="skeleton-table-row"></div>
+                                 <div class="skeleton-table-row"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
         </div>
 
@@ -448,5 +545,11 @@
 
     </div>
     
+    <!-- Skeleton Loader für die Arbeitszeitauswertung-View (optional, aber gut für UX) -->
+    <div class="work-time-eval-view-skeleton skeleton-view" style="display: none;">
+        <div class="skeleton-header"></div>
+        <div class="skeleton-content-block"></div>
+        <div class="skeleton-content-block" style="height: 100px;"></div>
+    </div>
 </body>
 </html>
