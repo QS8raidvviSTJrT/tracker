@@ -2467,3 +2467,41 @@ body.nav-hidden .nav-fab {
     color: var(--primary-color-contrast-dark, #1a202c);
     border-color: var(--primary-color-dark-theme, #4dabf7);
 }
+
+#mapViewMapContainer {
+    height: 100%; /* Stellt sicher, dass der Container die Höhe füllt */
+    width: 100%;
+}
+
+/* Stil für eine "Keine Daten"-Nachricht auf der Karte */
+.no-data-map-message {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    text-align: center;
+}
+.no-data-map-message h4 {
+    margin-top: 0;
+}
+
+/* Leaflet Popups an Theme anpassen */
+.leaflet-popup-content-wrapper {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border-radius: 8px;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+}
+.leaflet-popup-content {
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+.leaflet-popup-tip {
+    background: var(--card-bg);
+}
+.leaflet-popup-close-button {
+    color: var(--text-color) !important; /* Wichtig für Überschreiben */
+}
+.leaflet-popup-close-button:hover {
+    color: var(--primary-color) !important;
+}

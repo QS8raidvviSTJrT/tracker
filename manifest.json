@@ -5,8 +5,26 @@
 
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#ffffff",
+    "background_color": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#ffffff"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#111827"
+      }
+    ],
+    "theme_color": [
+      {
+        "media": "(prefers-color-scheme: light)",
+        "color": "#ffffff"
+      },
+      {
+        "media": "(prefers-color-scheme: dark)",
+        "color": "#111827"
+      }
+    ],
     "icons": [
         {
             "src": "images/180.png",

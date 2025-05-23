@@ -1799,6 +1799,22 @@ window.switchView = function(viewIdToShow, viewTitle) {
              updateGreetingPlaceholder(); // NEU: Platzhalter-Begrüßung aktualisieren
              if (streetDetailContainer.style.display !== 'none') { backToStreetList(); }
             break;
+        case 'mapView':
+            console.log("[switchView] Initialisiere Kartenansicht");
+            if (mapViewLoadingIndicator) mapViewLoadingIndicator.style.display = 'flex'; // Ladeindikator anzeigen
+
+            // Sicherstellen, dass der Container sichtbar ist und Dimensionen hat, bevor initMap aufgerufen wird.
+            // Dies geschieht durch das Aktivieren der View. Manchmal braucht Leaflet eine kleine Verzögerung.
+            setTimeout(() => {
+                if (typeof initMap === 'function') {
+                    initMap(); // Diese Funktion kommt aus map.js
+                } else {
+                    console.error("initMap Funktion nicht gefunden. map.js geladen und korrekt initialisiert?");
+                    if (typeof showErrorNotification === 'function') showErrorNotification("Kartenfunktion konnte nicht initialisiert werden.");
+                    if (mapViewLoadingIndicator) mapViewLoadingIndicator.style.display = 'none';
+                }
+            }, 50); // Kleine Verzögerung, um sicherzustellen, dass das DOM bereit ist
+            break;
     }
 
      // Scrollt die neue Ansicht nach oben (unverändert)
