@@ -1402,9 +1402,18 @@ body.nav-hidden .nav-fab {
     margin-bottom: 2px;
 }
 
+/* NEU: Wrapper für Input und Button */
+.input-with-button {
+    display: flex;
+    align-items: center; /* Elemente vertikal zentrieren */
+    gap: 10px; /* Abstand zwischen Input und Button */
+    margin-bottom: 10px; /* Abstand zum nächsten Element (z.B. settingsStatus) */
+}
+
 .settings-form input#displayNameInput {
     /* Nimmt generische Input-Stile an */
-    margin-bottom: 15px; /* Abstand zum Button */
+    flex-grow: 1; /* Input nimmt verfügbaren Platz ein */
+    margin-bottom: 0; /* Entfernt den vorherigen Abstand, da jetzt im Flex-Container */
 }
 
 .settings-section {
@@ -1425,11 +1434,20 @@ body.nav-hidden .nav-fab {
 }
 
 #saveSettingsButton {
-     /* Nimmt primären Button-Stil an */
-     background-color: var(--primary-color);
-     color: var(--text-on-primary);
-     align-self: flex-start; /* Button nicht auf volle Breite strecken */
-     padding: 10px 20px; /* Standard-Padding */
+    background-color: var(--primary-color);
+    color: var(--text-on-primary);
+    /* align-self: flex-start; ENTFERNT, nicht mehr nötig im Flex-Container */
+    /* padding: 10px 20px;  Padding wird angepasst für Icon-Button-Look */
+    padding: 10px; /* Gleichmäßiges Padding für Icon-Button */
+    min-width: 40px; /* Mindestbreite */
+    height: 40px;    /* Feste Höhe passend zum Input */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0; /* Verhindert, dass der Button schrumpft */
+}
+#saveSettingsButton .material-icons {
+    font-size: 20px; /* Passende Icon-Größe */
 }
 #saveSettingsButton:hover {
     background-color: var(--secondary-color);
@@ -2397,3 +2415,55 @@ body.nav-hidden .nav-fab {
 }
 
 /* ... restliche CSS-Stile ... */
+
+.filter-controls {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding: 0 10px; /* Etwas Platz an den Seiten, falls die Buttons umbrechen */
+    flex-wrap: wrap; /* Erlaubt Umbruch auf kleinen Bildschirmen */
+}
+
+.filter-button {
+    padding: 8px 12px; /* Etwas kompakter */
+    border: 1px solid var(--primary-color-light, #79bbff); /* Hellerer Rand */
+    background-color: var(--card-bg, white); /* Hintergrund wie Karten */
+    color: var(--primary-color, #0d6efd);
+    border-radius: 20px; /* Runde Ecken */
+    cursor: pointer;
+    font-size: 0.85em; /* Kleinere Schrift */
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.filter-button:hover {
+    background-color: var(--primary-color-x-light, #e0efff); /* Sehr heller Hover-Effekt */
+    border-color: var(--primary-color, #0d6efd);
+}
+
+.filter-button.active {
+    background-color: var(--primary-color, #0d6efd);
+    color: var(--primary-color-contrast, white); /* Kontrastfarbe für Text */
+    border-color: var(--primary-color, #0d6efd);
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Für Dark Mode (optional, an deine Variablen anpassen) */
+[data-theme="dark"] .filter-button {
+    border-color: var(--primary-color-dark-theme, #4dabf7); /* Beispiel für Dark Mode Primary */
+    background-color: var(--card-bg-dark, #2d3748);
+    color: var(--primary-color-dark-theme, #4dabf7);
+}
+
+[data-theme="dark"] .filter-button:hover {
+    background-color: var(--primary-color-dark-hover, #1a202c); /* Dunklerer Hover */
+}
+
+[data-theme="dark"] .filter-button.active {
+    background-color: var(--primary-color-dark-theme, #4dabf7);
+    color: var(--primary-color-contrast-dark, #1a202c);
+    border-color: var(--primary-color-dark-theme, #4dabf7);
+}

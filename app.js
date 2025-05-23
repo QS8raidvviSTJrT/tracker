@@ -10,6 +10,9 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
         const LS_LAST_OPENED_STREET_KEY = 'doorTrackerLastOpenedStreet'; // NEU
         const LS_COLOR_SCHEME_KEY = 'doorTrackerColorScheme'; // NEU für Farbschema
 
+        // NEU: Globale Variable für den aktuellen Statistik-Filter
+        let currentStatsFilter = 'allTime'; // Mögliche Werte: 'allTime', 'thisYear', 'thisMonth', 'thisWeek', 'today'
+
         // Cache für Overpass-Daten (Gesamtzahl Hausnummern) - Sicherstellen, dass es global ist
         const totalHouseNumbersCache = new Map();
         const TOTAL_HN_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 Stunden in Millisekunden
@@ -175,6 +178,7 @@ let timeTrackingControls, timeTrackingStatusDisplay, currentStatusText, currentW
 let startWorkButton, stopWorkButton;
 let timeTrackingHistory, historyDateInput, dailySummaryDisplay, summaryDateDisplay, summaryTotalWork; // summaryTotalBreak entfernt
 let timeEntriesList, noHistoryEntriesMessage;
+let workTimeExportContainer, workTimeExportMonthSelect, exportSelectedMonthButton; // NEU für PDF-Export
 
 // Globale Zustandsvariablen für Zeiterfassung
 let activeWorkEntryId = null;
@@ -474,7 +478,7 @@ window.login = async function() {
 
     try {
         // 1. Prüfe den Registrierungscode direkt aus der Tabelle
-        console.log("Versuche Registrierungscode zu prüfen via direkter Tabellenabfrage:", registrationCodeValue);
+        //console.log("Versuche Registrierungscode zu prüfen via direkter Tabellenabfrage:", registrationCodeValue);
         const { data: codeData, error: validationError } = await supabaseClient
             .from('registration_codes')
             .select('id, code_value, is_used, used_by')
@@ -485,7 +489,7 @@ window.login = async function() {
             console.error('Supabase Fehler beim Prüfen des Registrierungscodes (Tabelle):', validationError);
             throw new Error('Fehler bei der Code-Prüfung. Versuche es später erneut.');
         }
-        console.log("Antwort von direkter Tabellenabfrage registration_codes:", codeData);
+        //console.log("Antwort von direkter Tabellenabfrage registration_codes:", codeData);
 
         if (!codeData) {
             // console.warn("Code nicht in der Datenbank gefunden für:", registrationCodeValue);
@@ -502,14 +506,14 @@ window.login = async function() {
         fetchedCodeId = codeData.id;
 
         // 2. Registriere den Benutzer
-        console.log("Code ist gültig und unbenutzt. Versuche Benutzer zu registrieren...");
+        //console.log("Code ist gültig und unbenutzt. Versuche Benutzer zu registrieren...");
         const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({ email, password });
         if (signUpError) {
             console.error('Supabase Fehler bei auth.signUp:', signUpError);
             throw signUpError;
         }
 
-        console.log("Benutzer erfolgreich registriert:", signUpData.user.email, "User ID:", signUpData.user.id);
+        //console.log("Benutzer erfolgreich registriert:", signUpData.user.email, "User ID:", signUpData.user.id);
 
         // 3. Markiere den Code als benutzt durch direktes Update
         if (!fetchedCodeId) {
@@ -517,7 +521,7 @@ window.login = async function() {
             throw new Error("Interner Fehler: Code-ID nicht gefunden nach Validierung.");
         }
 
-        console.log("Versuche Code als benutzt zu markieren (direktes Update) für Code ID:", fetchedCodeId, "User ID:", signUpData.user.id);
+        //console.log("Versuche Code als benutzt zu markieren (direktes Update) für Code ID:", fetchedCodeId, "User ID:", signUpData.user.id);
         const { error: claimError } = await supabaseClient
             .from('registration_codes')
             .update({
@@ -530,14 +534,14 @@ window.login = async function() {
         if (claimError) {
             console.error('KRITISCH: User erstellt, aber Code konnte nicht (direktes Update) als "benutzt" markiert werden:', claimError);
         } else {
-            console.log("Code erfolgreich als benutzt markiert (direktes Update).");
+            //console.log("Code erfolgreich als benutzt markiert (direktes Update).");
         }
 
         alert('Registrierung erfolgreich! Bitte E-Mail-Adresse bestätigen und erneut einloggen.');
         showLoginInterface();
 
     } catch (error) {
-        console.error("Fehler im gesamten Registrierungsprozess:", error);
+        //console.error("Fehler im gesamten Registrierungsprozess:", error);
         showError('Registrierung fehlgeschlagen: ' + error.message);
          if (error.message.toLowerCase().includes('code') || error.message.toLowerCase().includes('registrierungscode')) {
             if (registrationCodeInput) registrationCodeInput.classList.add('error-input');
@@ -569,7 +573,6 @@ window.registerNow = function() {
     if (registerLink) registerLink.style.display = 'none';
     document.getElementById('resetText').style.display = 'none'; // Passwort vergessen ausblenden
     if (registrationCodeContainer) registrationCodeContainer.style.display = 'block'; // Code-Feld anzeigen
-    if (registrationCodeInput) registrationCodeInput.focus(); // Fokus auf Code-Feld
 
 
     // Füge Link hinzu, um zum Login zurückzukehren, falls nicht schon vorhanden
@@ -643,8 +646,7 @@ window.locateMe = async function() {
         }
     } catch (error) {
         showErrorNotification("Fehler bei der Standortabfrage oder PLZ-Ermittlung: " + (error.message || error.toString()));
-        // console.warn("Fehler bei der Standortabfrage oder PLZ-Ermittlung:", error);
-        showErrorNotification("Fehler bei der Standortabfrage oder PLZ-Ermittlung: " + (error.message || error.toString()));
+        console.warn("Fehler bei der Standortabfrage oder PLZ-Ermittlung:", error);
         let errorMessage = "Standort konnte nicht abgerufen werden.";
         if (error.code) {
             switch (error.code) {
@@ -2074,23 +2076,74 @@ async function loadStatsData() {
 
     // Skeleton wird von switchView angezeigt. Inhalt wird von switchView ausgeblendet.
     if (statsErrorDisplay) statsErrorDisplay.style.display = 'none';
-    // if (statsLoadingIndicator) statsLoadingIndicator.style.display = 'flex'; // ENTFERNT: Spinner nicht mehr anzeigen
     const adminButtonContainer = document.getElementById('adminButtonContainerStats');
     if (adminButtonContainer) {
         adminButtonContainer.style.display = 'none'; // Initial ausblenden
     }
 
+    // UI für Filter-Buttons aktualisieren (falls sie schon im DOM sind)
+    const filterButtons = document.querySelectorAll('#statsFilterControls .filter-button');
+    filterButtons.forEach(button => {
+        if (button.dataset.filter === currentStatsFilter) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+    });
+
+
     try {
-        // Hole alle Einträge, die vom aktuellen Benutzer ERSTELLT wurden
-        const { data: entries, error } = await supabaseClient
+        let query = supabaseClient
             .from('house_entries')
-            .select('status, creator_id') // Stelle sicher, dass creator_id mit abgefragt wird
-            .eq('creator_id', currentUser.id); // Filtere nach dem Ersteller
+            .select('status, creator_id, last_visit_date') // last_visit_date für Filterung verwenden
+            .eq('creator_id', currentUser.id);
+
+        const now = new Date();
+        let startDate, endDate;
+
+        // Setze Start- und Enddatum basierend auf dem Filter
+        // Wichtig: .toISOString() konvertiert in UTC, was Supabase erwartet.
+        switch (currentStatsFilter) {
+            case 'thisYear':
+                startDate = new Date(now.getFullYear(), 0, 1); // 1. Januar dieses Jahres, 00:00:00 lokale Zeit
+                endDate = new Date(now.getFullYear() + 1, 0, 1); // 1. Januar nächstes Jahres, 00:00:00 lokale Zeit
+                query = query.gte('last_visit_date', startDate.toISOString()).lt('last_visit_date', endDate.toISOString());
+                break;
+            case 'thisMonth':
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1); // Erster Tag dieses Monats, 00:00:00
+                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1); // Erster Tag nächsten Monats, 00:00:00
+                query = query.gte('last_visit_date', startDate.toISOString()).lt('last_visit_date', endDate.toISOString());
+                break;
+            case 'thisWeek':
+                const currentDay = now.getDay(); // Sonntag = 0, Montag = 1, ..., Samstag = 6
+                const diffToMonday = (currentDay === 0) ? -6 : (1 - currentDay); // Tage bis zum letzten Montag
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+                startDate.setHours(0, 0, 0, 0); // Montag dieser Woche, 00:00:00
+
+                endDate = new Date(startDate);
+                endDate.setDate(startDate.getDate() + 7); // Montag nächster Woche, 00:00:00
+                query = query.gte('last_visit_date', startDate.toISOString()).lt('last_visit_date', endDate.toISOString());
+                break;
+            case 'today':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                startDate.setHours(0,0,0,0); // Heute, 00:00:00 lokale Zeit
+
+                endDate = new Date(startDate);
+                endDate.setDate(startDate.getDate() + 1); // Morgen, 00:00:00 lokale Zeit
+                query = query.gte('last_visit_date', startDate.toISOString()).lt('last_visit_date', endDate.toISOString());
+                break;
+            case 'allTime':
+            default:
+                // Keine zusätzlichen Zeitfilter für 'allTime'
+                break;
+        }
+
+        const { data: entries, error } = await query;
 
         if (error) throw error;
 
-        // Statistiken berechnen (nur für die Einträge dieses Users)
-        const totalEntries = entries.length; // Gesamtanzahl der vom User erstellten Einträge
+        // Statistiken berechnen (nur für die Einträge dieses Users im gefilterten Zeitraum)
+        const totalEntries = entries.length;
         const statusCounts = {
             'Geschrieben': 0,
             'Kein Interesse': 0,
@@ -2104,13 +2157,10 @@ async function loadStatsData() {
             if (statusCounts.hasOwnProperty(status)) {
                 statusCounts[status]++;
             } else {
-                 // Falls ein unerwarteter Status auftaucht, zähle ihn zu 'Andere'
-                 // oder logge einen Fehler, je nach gewünschtem Verhalten.
-                 // Für jetzt: Zähle zu 'Andere', wenn nicht explizit 'null'
                  if (status !== 'null') {
                     statusCounts['Andere']++;
                  } else {
-                    statusCounts['null']++; // Explizit null-Status zählen
+                    statusCounts['null']++;
                  }
             }
         });
@@ -2118,10 +2168,10 @@ async function loadStatsData() {
         displayStatsData(totalEntries, statusCounts);
         renderStatusChart(statusCounts);
 
-        if (statsContent) statsContent.style.display = 'block'; // Inhalt anzeigen
-        if (statsViewSkeleton) statsViewSkeleton.classList.add('hidden'); // Skeleton ausblenden
+        if (statsContent) statsContent.style.display = 'block';
+        if (statsViewSkeleton) statsViewSkeleton.classList.add('hidden');
         if (adminButtonContainer && ADMIN_USER_IDS.includes(currentUser.id)) {
-            adminButtonContainer.style.display = 'block'; // Oder 'flex', je nach Styling des Containers
+            adminButtonContainer.style.display = 'block';
             console.log("Admin-Benutzer in StatsView erkannt, Admin-Button wird angezeigt.");
         } else if (adminButtonContainer) {
             adminButtonContainer.style.display = 'none';
@@ -2134,10 +2184,8 @@ async function loadStatsData() {
             statsErrorDisplay.textContent = `Fehler beim Laden der Statistiken: ${error.message}`;
             statsErrorDisplay.style.display = 'block';
         }
-        if (statsViewSkeleton) statsViewSkeleton.classList.add('hidden'); // Skeleton bei Fehler ausblenden
-        if (statsContent) statsContent.style.display = 'none'; // Sicherstellen, dass Inhalt ausgeblendet bleibt
-    } finally {
-        // if (statsLoadingIndicator) statsLoadingIndicator.style.display = 'none'; // ENTFERNT
+        if (statsViewSkeleton) statsViewSkeleton.classList.add('hidden');
+        if (statsContent) statsContent.style.display = 'none';
     }
 }
 
@@ -2383,6 +2431,7 @@ function renderStatusChart(statusCounts) {
             maintainAspectRatio: true,
             plugins: {
                 legend: {
+                    display: false, // LEGENDE AUSBLENDEN
                     position: 'bottom',
                     labels: {
                         padding: 20,
@@ -2560,6 +2609,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     checkSession(); // Startet die Session-Prüfung
+
+    // NEU: Sicherstellen, dass der Filter-Button-Status beim ersten Laden korrekt ist
+    // Dies ist relevant, falls die App direkt in der Stats-Ansicht startet (weniger wahrscheinlich)
+    // oder falls die Filter-Controls erst später hinzugefügt werden.
+    // Der Aufruf in loadStatsData() sollte aber ausreichen.
+    const initialFilterButtons = document.querySelectorAll('#statsFilterControls .filter-button');
+    if (initialFilterButtons.length > 0) { // Nur ausführen, wenn die Buttons schon da sind
+        initialFilterButtons.forEach(button => {
+            if (button.dataset.filter === currentStatsFilter) {
+                button.classList.add('active');
+            } else {
+                button.classList.remove('active');
+            }
+        });
+    }
 });
 
 // === NEU: Separate Funktion für Login Listener ===
@@ -2591,6 +2655,38 @@ function setupLoginEnterListeners() {
 }
 // === ENDE NEU ===
 
+// NEU: Funktion zum Setzen des Statistik-Filters und Neuladen der Daten
+window.setStatsFilter = function(filterValue) {
+    if (!['allTime', 'thisYear', 'thisMonth', 'thisWeek', 'today'].includes(filterValue)) {
+        console.warn("Ungültiger Filterwert:", filterValue);
+        return;
+    }
+    currentStatsFilter = filterValue;
+
+    // Aktiven Button hervorheben
+    const filterButtons = document.querySelectorAll('#statsFilterControls .filter-button');
+    filterButtons.forEach(button => {
+        if (button.dataset.filter === filterValue) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+    });
+
+    // Daten neu laden mit dem ausgewählten Filter
+    // Stelle sicher, dass Skeleton angezeigt und alter Inhalt versteckt wird, falls nötig
+    if (document.getElementById('statsView').classList.contains('active-view')) {
+        if (statsViewSkeleton) statsViewSkeleton.classList.remove('hidden');
+        if (statsContent) statsContent.style.display = 'none';
+        if (statsErrorDisplay) statsErrorDisplay.style.display = 'none'; // Alte Fehler ausblenden
+        if (statsChartInstance) { // Altes Chart zerstören, um Neuzeichnen zu erzwingen
+            statsChartInstance.destroy();
+            statsChartInstance = null;
+        }
+        loadStatsData();
+    }
+}
+
 // NEUE Platzhalter-Funktion für Kalenderdaten
 async function loadCalendarData() {
     if (!currentUser || !calendarView ) return;
@@ -2617,6 +2713,10 @@ async function loadCalendarData() {
         await checkActiveWorkEntry(); // Prüfen, ob ein Eintrag aktiv ist und UI/Timer aktualisiert
         await loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); // Historie für ausgewähltes Datum laden
         await updateTodaySummary(); // NEU: Sicherstellen, dass die "Heute"-Zusammenfassung aktuell ist
+
+        // --- NEU: Export-Funktionalität initialisieren ---
+        setupWorkTimeExportUI();
+        // --- ENDE NEU ---
 
         // Inhalt anzeigen, NACHDEM Daten geladen wurden
         if (timeTrackingControls) timeTrackingControls.style.display = 'block'; // Oder 'flex', falls es ein Flex-Container ist
@@ -2656,6 +2756,11 @@ function initializeCalendarViewDOMElements() {
     // summaryTotalBreak = document.getElementById('summaryTotalBreak'); // Entfernt
     timeEntriesList = document.getElementById('timeEntriesList');
     noHistoryEntriesMessage = document.getElementById('noHistoryEntriesMessage');
+
+    // NEU: DOM-Elemente für den Arbeitszeit-Export
+    workTimeExportContainer = document.getElementById('workTimeExportContainer');
+    workTimeExportMonthSelect = document.getElementById('workTimeExportMonthSelect');
+    exportSelectedMonthButton = document.getElementById('exportSelectedMonthButton');
 }
 
 
@@ -4313,4 +4418,261 @@ function isValidHttpUrl(string) {
   return url.protocol === "http:" || url.protocol === "https:";
 }
 
-// --- ENDE NEUE FUNKTIONEN für Arbeitszeitauswertung ---
+// --- NEU: Funktionen für den Export der eigenen Arbeitszeiten ---
+async function setupWorkTimeExportUI() {
+    if (!calendarView || !currentUser) return;
+
+    // Entferne alten Container, falls vorhanden (um Duplikate bei erneutem Laden der View zu vermeiden)
+    const existingExportContainer = document.getElementById('workTimeExportContainer');
+    if (existingExportContainer) {
+        existingExportContainer.remove();
+    }
+
+    // Erstelle den Container für die Export-Optionen
+    workTimeExportContainer = document.createElement('div');
+    workTimeExportContainer.id = 'workTimeExportContainer';
+    workTimeExportContainer.style.marginTop = '20px';
+    workTimeExportContainer.style.paddingTop = '15px';
+    workTimeExportContainer.style.borderTop = '1px solid var(--border-color-soft)';
+
+    const heading = document.createElement('h4');
+    heading.textContent = 'Meine Arbeitszeiten exportieren';
+    workTimeExportContainer.appendChild(heading);
+
+    workTimeExportMonthSelect = document.createElement('select');
+    workTimeExportMonthSelect.id = 'workTimeExportMonthSelect';
+    workTimeExportMonthSelect.style.marginBottom = '10px';
+    workTimeExportMonthSelect.style.width = '100%';
+    workTimeExportMonthSelect.style.padding = '10px';
+    workTimeExportMonthSelect.style.border = '1px solid var(--border-color, #ccc)';
+    workTimeExportMonthSelect.style.borderRadius = '5px';
+
+
+    const defaultOption = document.createElement('option');
+    defaultOption.value = "";
+    defaultOption.textContent = "-- Monat auswählen --";
+    workTimeExportMonthSelect.appendChild(defaultOption);
+    workTimeExportContainer.appendChild(workTimeExportMonthSelect);
+
+    exportSelectedMonthButton = document.createElement('button');
+    exportSelectedMonthButton.id = 'exportSelectedMonthButton';
+    exportSelectedMonthButton.className = 'buttonnumpad'; // Oder eine andere passende Klasse
+    exportSelectedMonthButton.textContent = 'Ausgewählten Monat als PDF exportieren';
+    exportSelectedMonthButton.style.marginTop = '10px';
+    exportSelectedMonthButton.disabled = true; // Initial deaktiviert
+    workTimeExportContainer.appendChild(exportSelectedMonthButton);
+
+    // Füge den Container unterhalb der Historie ein (timeTrackingHistory)
+    if (timeTrackingHistory && timeTrackingHistory.parentNode) {
+        timeTrackingHistory.parentNode.insertBefore(workTimeExportContainer, timeTrackingHistory.nextSibling);
+    } else {
+        // Fallback, falls timeTrackingHistory nicht da ist (sollte nicht passieren)
+        calendarView.appendChild(workTimeExportContainer);
+    }
+
+    // Event-Listener für das Select-Element, um den Button zu aktivieren/deaktivieren
+    workTimeExportMonthSelect.addEventListener('change', () => {
+        exportSelectedMonthButton.disabled = !workTimeExportMonthSelect.value;
+    });
+
+    // Event-Listener für den Export-Button
+    exportSelectedMonthButton.addEventListener('click', async () => {
+        const selectedValue = workTimeExportMonthSelect.value;
+        if (selectedValue) {
+            const [year, month] = selectedValue.split('-');
+            await exportMyWorkTimeAsPdf(parseInt(year), parseInt(month));
+        }
+    });
+
+    // Fülle das Dropdown mit den verfügbaren Monaten
+    await populateWorkTimeExportDropdown();
+}
+
+async function populateWorkTimeExportDropdown() {
+    if (!workTimeExportMonthSelect || !currentUser) return;
+
+    // Optionen leeren (außer der Default-Option)
+    while (workTimeExportMonthSelect.options.length > 1) {
+        workTimeExportMonthSelect.remove(1);
+    }
+
+    try {
+        const { data: entries, error } = await supabaseClient
+            .from('work_time_entries')
+            .select('start_time')
+            .eq('user_id', currentUser.id)
+            .not('start_time', 'is', null) // Nur Einträge mit Startzeit berücksichtigen
+            .order('start_time', { ascending: false });
+
+        if (error) throw error;
+
+        if (!entries || entries.length === 0) {
+            workTimeExportMonthSelect.disabled = true;
+            exportSelectedMonthButton.disabled = true;
+            // Optional: Nachricht anzeigen, dass keine Daten vorhanden sind
+            const noDataOption = document.createElement('option');
+            noDataOption.value = "";
+            noDataOption.textContent = "Keine Einträge für Export vorhanden";
+            noDataOption.disabled = true;
+            workTimeExportMonthSelect.appendChild(noDataOption);
+            return;
+        }
+
+        const availableMonths = new Set();
+        entries.forEach(entry => {
+            const startDate = new Date(entry.start_time);
+            const year = startDate.getFullYear();
+            const month = startDate.getMonth() + 1; // Monate sind 0-basiert
+            availableMonths.add(`${year}-${String(month).padStart(2, '0')}`);
+        });
+
+        // Sortierte Monate zum Dropdown hinzufügen (neueste zuerst)
+        Array.from(availableMonths).sort().reverse().forEach(monthYear => {
+            const [year, month] = monthYear.split('-');
+            const option = document.createElement('option');
+            option.value = monthYear;
+            const monthDate = new Date(parseInt(year), parseInt(month) - 1);
+            option.textContent = monthDate.toLocaleString('de-DE', { month: 'long', year: 'numeric' });
+            workTimeExportMonthSelect.appendChild(option);
+        });
+
+        workTimeExportMonthSelect.disabled = false;
+        // Der Export-Button bleibt deaktiviert, bis ein Monat ausgewählt wird (siehe EventListener in setupWorkTimeExportUI)
+
+    } catch (error) {
+        console.error("Fehler beim Füllen des Monats-Dropdowns für Export:", error);
+        showErrorNotification("Fehler beim Laden der Export-Monate: " + error.message);
+        workTimeExportMonthSelect.disabled = true;
+        exportSelectedMonthButton.disabled = true;
+    }
+}
+
+async function exportMyWorkTimeAsPdf(year, month) {
+    if (!currentUser) {
+        showErrorNotification("Kein Benutzer angemeldet.");
+        return;
+    }
+
+    // Sicherstellen, dass jsPDF geladen ist
+    if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined') {
+        showErrorNotification("jsPDF Bibliothek nicht gefunden. Bitte binden Sie sie in die HTML-Datei ein.");
+        console.error("jsPDF nicht geladen.");
+        return;
+    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF(); // jsPDF-Instanz erstellen
+
+    // Sicherstellen, dass das autoTable Plugin auf der Instanz verfügbar ist
+    if (typeof doc.autoTable !== 'function') {
+        showErrorNotification("jsPDF-AutoTable Plugin nicht auf jsPDF Instanz gefunden. Stellen Sie sicher, dass 'jspdf.plugin.autotable.min.js' korrekt geladen wurde.");
+        console.error("doc.autoTable ist keine Funktion. Überprüfen Sie die Einbindung von jspdf-autotable.");
+        return;
+    }
+
+    const monthName = new Date(year, month - 1).toLocaleString('de-DE', { month: 'long' });
+    const title = `Meine Arbeitszeitauswertung für ${monthName} ${year}`;
+    const filename = `Arbeitszeiten_${currentUser.user_metadata?.display_name || 'User'}_${year}_${String(month).padStart(2, '0')}.pdf`;
+
+    showErrorNotification(`Export für ${monthName} ${year} wird vorbereitet...`);
+
+    try {
+        // 1. Lade die work_time_entries für den aktuellen Benutzer und den ausgewählten Monat/Jahr.
+        const firstDayOfMonth = new Date(year, month - 1, 1);
+        const lastDayOfMonth = new Date(year, month, 0, 23, 59, 59, 999); // Letzter Tag des Monats, Ende des Tages
+
+        const { data: entries, error: fetchError } = await supabaseClient
+            .from('work_time_entries')
+            .select('start_time, end_time, duration_minutes')
+            .eq('user_id', currentUser.id)
+            .gte('start_time', firstDayOfMonth.toISOString())
+            .lte('start_time', lastDayOfMonth.toISOString())
+            .not('duration_minutes', 'is', null) // Nur abgeschlossene Einträge
+            .order('start_time', { ascending: true });
+
+        if (fetchError) {
+            throw new Error(`Fehler beim Laden der Arbeitszeitdaten: ${fetchError.message}`);
+        }
+
+        if (!entries || entries.length === 0) {
+            showErrorNotification(`Keine Arbeitszeiteinträge für ${monthName} ${year} gefunden.`);
+            doc.setFontSize(18);
+            doc.text(title, 14, 22);
+            doc.setFontSize(12);
+            doc.text(`Benutzer: ${currentUser.user_metadata?.display_name || currentUser.email || 'Unbekannt'}`, 14, 30);
+            doc.text(`Exportiert am: ${new Date().toLocaleString('de-DE')}`, 14, 38);
+            doc.text(`Keine Einträge für ${monthName} ${year} vorhanden.`, 14, 50);
+            doc.save(filename);
+            return;
+        }
+
+        // 2. Berechne die Gesamt-Arbeitszeit für den Monat.
+        let totalMinutesMonth = 0;
+        entries.forEach(entry => {
+            if (typeof entry.duration_minutes === 'number') {
+                totalMinutesMonth += entry.duration_minutes;
+            }
+        });
+        const totalHoursMonthFormatted = formatMinutesToHM(totalMinutesMonth);
+
+        // PDF-Kopfzeile
+        doc.setFontSize(18);
+        doc.text(title, 14, 22);
+        doc.setFontSize(12);
+        doc.text(`Benutzer: ${currentUser.user_metadata?.display_name || currentUser.email || 'Unbekannt'}`, 14, 30);
+        doc.text(`Gesamtarbeitszeit ${monthName} ${year}: ${totalHoursMonthFormatted}`, 14, 38);
+        doc.text(`Exportiert am: ${new Date().toLocaleString('de-DE')}`, 14, 46);
+
+
+        // 3. Formatiere die Daten für die Tabelle.
+        const tableColumns = [
+            { header: 'Datum', dataKey: 'date' },
+            { header: 'Startzeit', dataKey: 'startTime' },
+            { header: 'Endzeit', dataKey: 'endTime' },
+            { header: 'Dauer (Min.)', dataKey: 'duration' }
+        ];
+
+        const tableBody = entries.map(entry => {
+            const startDate = new Date(entry.start_time);
+            return {
+                date: startDate.toLocaleDateString('de-DE'),
+                startTime: formatTime(startDate),
+                endTime: entry.end_time ? formatTime(new Date(entry.end_time)) : 'Laufend',
+                duration: entry.duration_minutes !== null ? entry.duration_minutes : 'N/A'
+            };
+        });
+
+        // 4. Verwende doc.autoTable, um die Tabelle ins PDF zu zeichnen.
+        doc.autoTable({ // doc.autoTable direkt aufrufen
+            columns: tableColumns,
+            body: tableBody,
+            startY: 54, // Start nach der Kopfzeile
+            theme: 'striped',
+            headStyles: { fillColor: [22, 160, 133] }, // Ein Grünton
+            styles: { fontSize: 10, cellPadding: 2 },
+            columnStyles: {
+                duration: { halign: 'right' }
+            },
+            didDrawPage: function (data) {
+                // Fußzeile mit Seitenzahl
+                let str = "Seite " + doc.internal.getNumberOfPages();
+                if (typeof doc.putTotalPages === 'function') { // Für jsPDF v3+
+                    str = str + " von " + "{totalPages}";
+                }
+                doc.setFontSize(8);
+                doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+            }
+        });
+
+        if (typeof doc.putTotalPages === 'function') { // Für jsPDF v3+
+            doc.putTotalPages("{totalPages}");
+        }
+
+        doc.save(filename);
+        showErrorNotification(`PDF "${filename}" erfolgreich heruntergeladen.`);
+
+    } catch (err) {
+        console.error(`Fehler beim Erstellen des PDFs für ${monthName} ${year}:`, err);
+        showErrorNotification(`Fehler beim Export für ${monthName} ${year}: ${err.message}`);
+    }
+}
+// --- ENDE NEUE FUNKTIONEN ---

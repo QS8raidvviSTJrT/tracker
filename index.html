@@ -187,6 +187,14 @@
                     </div>
                 </div>
 
+                <div id="statsFilterControls" class="filter-controls">
+                    <button class="filter-button active" data-filter="allTime" onclick="setStatsFilter('allTime')">Gesamt</button>
+                    <button class="filter-button" data-filter="thisYear" onclick="setStatsFilter('thisYear')">Dieses Jahr</button>
+                    <button class="filter-button" data-filter="thisMonth" onclick="setStatsFilter('thisMonth')">Dieser Monat</button>
+                    <button class="filter-button" data-filter="thisWeek" onclick="setStatsFilter('thisWeek')">Diese Woche</button>
+                    <button class="filter-button" data-filter="today" onclick="setStatsFilter('today')">Heute</button>
+                </div>
+
                 <div id="statsContent" style="display: none;">
                     <div class="content-card">
                         <h2>Deine Statistik</h2>
@@ -305,9 +313,14 @@
                     <div class="content-card">
                         <h2>Einstellungen</h2>
                         <div class="settings-form">
-                            <label for="displayNameInput">Anzeigename (für Leaderboard):</label>
-                            <input type="text" id="displayNameInput" placeholder="Dein Name/Nickname">
-                            <button onclick="saveSettings()" id="saveSettingsButton">Namen speichern</button>
+                            <label for="displayNameInput">Vorname (für Leaderboard):</label>
+                            <div class="input-with-button">
+                                <input type="text" id="displayNameInput" placeholder="Dein Vorname/Nickname">
+                                <button onclick="saveSettings()" id="saveSettingsButton" class="icon-button" aria-label="Namen speichern">
+                                    <span class="material-icons">check</span>
+                                    <p style="font-size: 0.9em;">Speichern</p>
+                                </button>
+                            </div>
                             <p id="settingsStatus" style="margin-top: 10px; font-size: 0.9em;"></p>
                         </div>
                         <div class="settings-section" style="margin-top: 20px;">
@@ -463,25 +476,16 @@
                 <div id="adminContent" style="display: none;">
                     <div class="content-card">
                         <h2>Admin-Bereich: Datenexport</h2>
-                        <p style="margin-bottom: 20px;">Hier können verschiedene Daten als PDF exportiert werden. Diese Funktion ist noch in Entwicklung.</p>
+                        <p style="margin-bottom: 20px;">Hier können verschiedene Daten als PDF exportiert werden. Diese Funktion ist noch in Entwicklung. Es wird empfohlen, diese Funktion nur auf dem Desktop zu verwenden.</p>
                         <div class="admin-export-buttons">
-                            <button onclick="exportDataAsPdf('users')" class="button-primary">
-                                <span class="material-icons">people</span> Benutzerdaten exportieren
-                            </button>
+                            
                             <button onclick="exportDataAsPdf('streets')" class="button-primary">
                                 <span class="material-icons">signpost</span> Straßendaten exportieren
-                            </button>
-                            <button onclick="exportDataAsPdf('entries')" class="button-primary">
-                                <span class="material-icons">format_list_numbered</span> Hausnummerneinträge exportieren
-                            </button>
-                            <button onclick="exportDataAsPdf('work_time')" class="button-primary">
-                                <span class="material-icons">timer</span> Arbeitszeiten exportieren
-                            </button>
+                                <button class="admin-button" onclick="navigateToWorkTimeEvaluation()">
+                                    <span class="material-icons">schedule</span>
+                                    Arbeitszeitauswertung
+                                </button>
                         </div>
-                        <button class="admin-button" onclick="navigateToWorkTimeEvaluation()">
-                            <span class="material-icons">schedule</span>
-                            Arbeitszeitauswertung
-                        </button>
                     </div>
                 </div>
             </div>
