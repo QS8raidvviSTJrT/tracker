@@ -5,26 +5,8 @@
 
     "start_url": "/",
     "display": "standalone",
-    "background_color": [
-      {
-        "media": "(prefers-color-scheme: light)",
-        "color": "#ffffff"
-      },
-      {
-        "media": "(prefers-color-scheme: dark)",
-        "color": "#111827"
-      }
-    ],
-    "theme_color": [
-      {
-        "media": "(prefers-color-scheme: light)",
-        "color": "#ffffff"
-      },
-      {
-        "media": "(prefers-color-scheme: dark)",
-        "color": "#111827"
-      }
-    ],
+    "background_color": "#ffffff",
+    "theme_color": "#ffffff",
     "icons": [
         {
             "src": "images/180.png",
