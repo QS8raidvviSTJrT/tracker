@@ -66,8 +66,8 @@ html[data-theme="dark"] {
 
     /* ... andere Dark Mode Variablen ... */
     --button-secondary-bg: #0a0b0c; /* Dunkleres Grau für Dark Mode */
-    --button-secondary-text-color: #ced4da; /* Hellerer Text für Dark Mode */
-    --button-secondary-hover-bg: #5a6268;
+    --button-secondary-text-color: #000000; /* Hellerer Text für Dark Mode */
+    --button-secondary-hover-bg: #b7b7b7;
     /* Passe diese Farben für den Dark Mode an */
     --danger-color: #a91e2c; /* Ein etwas gedämpfteres oder angepasstes Rot für Dark Mode */
     --danger-color-hover: #8a1823;

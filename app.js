@@ -20,6 +20,9 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
         // Globale Daten für den Straßenfortschritt
         let streetProgressData = new Map(); // Key: "PLZ-Straßenname", Value: { processedCount: number, percentCompletedFromDB: number | null }
 
+        // NEU: Instanz für das Benachrichtigungssystem
+        let workTimeNotifier = null;
+
         // NEU: LocalStorage Helper Functions
         function saveToLocalStorage(key, data) {
             try {
@@ -2715,6 +2718,15 @@ async function loadCalendarData() {
     // Inhalt (timeTrackingControls, timeTrackingHistory) wird von switchView initial ausgeblendet.
     if (calendarErrorDisplay) calendarErrorDisplay.style.display = 'none';
 
+    // NEU: WorkTimeNotifications instanziieren, falls noch nicht geschehen
+    if (!workTimeNotifier && typeof WorkTimeNotifications !== 'undefined') {
+        workTimeNotifier = new WorkTimeNotifications({
+            // Hier könnten später benutzerspezifische Einstellungen geladen werden
+            // z.B. aus den User-Settings in Supabase oder LocalStorage
+        });
+        console.log("WorkTimeNotifications Instanz erstellt.");
+    }
+
 
     try {
         // Heutiges Datum für den Kalender-Input setzen
@@ -2878,6 +2890,13 @@ window.startWorkTimeTracking = async function() {
         activeWorkEntryId = data.id;
         workStartTime = new Date(data.start_time); 
         updateWorkUIActive();
+
+        // NEU: Benachrichtigungssystem informieren
+        if (workTimeNotifier) {
+            workTimeNotifier.startWorkTime();
+            console.log("WorkTimeNotifier: Arbeitszeit gestartet.");
+        }
+
         await loadDailySummaryAndEntries(historyDateInput ? historyDateInput.value : getLocalDateString(new Date())); 
         await updateTodaySummary(); 
     } catch (error) {
@@ -2937,6 +2956,12 @@ window.stopWorkTimeTracking = async function() {
             .eq('id', activeWorkEntryId);
 
         if (error) throw error;
+
+        // NEU: Benachrichtigungssystem informieren
+        if (workTimeNotifier) {
+            workTimeNotifier.endWorkTime();
+            console.log("WorkTimeNotifier: Arbeitszeit beendet.");
+        }
 
         activeWorkEntryId = null;
         workStartTime = null;
